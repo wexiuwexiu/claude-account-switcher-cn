@@ -46,7 +46,7 @@ const (
 	swpNoZOrder      = 0x0004
 	dpiPerMonitorV2  = ^uintptr(3) // DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 = -4
 	dashWidth        = 480         // 逻辑像素（96 DPI 下）
-	dashCardHeight   = 172
+	dashCardHeight   = 196
 	dashChromeHeight = 190
 )
 
