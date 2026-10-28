@@ -27,6 +27,11 @@ func TestNewerVersion(t *testing.T) {
 		{"", "0.2.0", false},
 		{"0.3", "0.2.0", false},
 		{"0.3.0-beta", "0.2.0", false},
+		{"0.3.3-wexiu.1", "0.3.3", true},
+		{"0.3.4", "0.3.3-wexiu.1", true},
+		{"0.3.3-wexiu.2", "0.3.3-wexiu.1", true},
+		{"0.3.3", "0.3.3-wexiu.1", false},
+		{"0.3.3-wexiu.x", "0.3.3", false},
 	} {
 		if got := newerVersion(c.a, c.b); got != c.want {
 			t.Errorf("newerVersion(%q, %q) = %v, want %v", c.a, c.b, got, c.want)

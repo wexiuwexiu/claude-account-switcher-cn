@@ -37,13 +37,16 @@ func (t *tray) onReady() {
 	t.status = systray.AddMenuItem("", "")
 	t.status.Disable()
 	t.status.Hide()
-	t.update = systray.AddMenuItem("", "Download the new version and restart on it")
+	// 改版不自动安装官方更新（会覆盖本地修改），点击只打开发布页。
+	t.update = systray.AddMenuItem("", "Open the release page; this modified build is not replaced")
 	t.update.Hide()
 	for i := range t.accounts {
 		t.accounts[i] = systray.AddMenuItemCheckbox("", "Switch the Claude app to this account", false)
 		t.accounts[i].Hide()
 	}
 	systray.AddSeparator()
+	// 图形仪表盘：所有账户的 5h / 周用量进度条与重置倒计时，见 dashboard.go
+	dash := systray.AddMenuItem("Dashboard…", "Show usage of every account as charts in the browser")
 	t.auto = systray.AddMenuItemCheckbox("Auto-switch when nearly full", "Switch to the account with the most room left", false)
 	limit := systray.AddMenuItem("Auto-switch at", "")
 	for _, v := range thresholds {
@@ -82,9 +85,14 @@ func (t *tray) onReady() {
 			}
 		}()
 	}
+	board := &dashboard{s: t.s}
+	// 左键单击托盘图标：打开/隐藏仪表盘；右键仍是菜单。
+	systray.SetOnTapped(func() { go board.open() })
 	go func() {
 		for {
 			select {
+			case <-dash.ClickedCh:
+				go board.open()
 			case <-t.auto.ClickedCh:
 				t.s.setAuto(!t.auto.Checked())
 			case <-t.spend.ClickedCh:
@@ -99,8 +107,8 @@ func (t *tray) onReady() {
 				}
 				setChecked(t.autostart, autostartEnabled())
 			case <-t.update.ClickedCh:
-				if v := t.s.snapshot().Update; v != "" {
-					go t.s.installUpdate(context.Background(), v)
+				if t.s.snapshot().Update != "" {
+					shellOpen(releasesURL + "/latest")
 				}
 			case <-folder.ClickedCh:
 				shellOpen(t.s.dir)
@@ -167,7 +175,7 @@ func (t *tray) render() {
 		t.status.Hide()
 	}
 	if snap.Update != "" {
-		t.update.SetTitle("Version " + snap.Update + " is out, click to update")
+		t.update.SetTitle("Official version " + snap.Update + " is out (click for release notes)")
 		t.update.Show()
 	} else {
 		t.update.Hide()
@@ -230,19 +238,27 @@ func usageText(a Account, threshold float64, now time.Time) string {
 		return "usage unknown"
 	}
 	u := a.Usage.current(now)
-	parts := []string{fmt.Sprintf("5h %.0f%%", u.Session), fmt.Sprintf("week %.0f%%", u.Weekly)}
-	if u.Session >= threshold && !u.SessionReset.IsZero() {
-		parts[0] += " until " + resetText(u.SessionReset, now)
-	}
-	// The weekly reset is always shown: it decides how much of the week is left to use.
-	switch {
-	case u.WeeklyReset.IsZero() || !u.WeeklyReset.After(now):
-	case u.Weekly >= threshold:
-		parts[1] += " until " + resetText(u.WeeklyReset, now)
-	default:
-		parts[1] += ", resets " + resetText(u.WeeklyReset, now)
+	// 5h 和 week 的重置时间都始终显示（只要 API 返回了未来的 resets_at）；
+	// 用量到阈值时写 "until"，表示要等到这个时间才能再用。
+	parts := []string{
+		"5h " + windowText(u.Session, u.SessionReset, threshold, now),
+		"week " + windowText(u.Weekly, u.WeeklyReset, threshold, now),
 	}
 	return strings.Join(parts, " · ")
+}
+
+// windowText 格式化单个限额窗口：百分比 + 重置时间。
+// reset 为零值或已过去时（窗口已重置 / 尚未开始计时）只显示百分比。
+func windowText(pct float64, reset time.Time, threshold float64, now time.Time) string {
+	s := fmt.Sprintf("%.0f%%", pct)
+	switch {
+	case reset.IsZero() || !reset.After(now):
+	case pct >= threshold:
+		s += " until " + resetText(reset, now)
+	default:
+		s += ", resets " + resetText(reset, now)
+	}
+	return s
 }
 
 func resetText(at, now time.Time) string {

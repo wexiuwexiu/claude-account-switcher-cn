@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Claude Account Switcher</title>
+<style>
+  :root {
+    --bg: #f5f5f7; --card: #fff; --text: #1d1d1f; --muted: #6e6e73; --line: #e5e5ea;
+    --track: rgba(142,142,147,.22); --ok: #34c759; --warn: #ff9f0a; --full: #ff3b30; --accent: #0a84ff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #1c1c1e; --card: #2c2c2e; --text: #f5f5f7; --muted: #98989d; --line: #3a3a3c; --track: rgba(142,142,147,.3); }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 24px; background: var(--bg); color: var(--text);
+         font: 14px/1.45 "Segoe UI", "Microsoft YaHei", system-ui, sans-serif; }
+  header { display: flex; align-items: baseline; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+  h1 { font-size: 18px; margin: 0; font-weight: 600; }
+  .meta { color: var(--muted); font-size: 12px; }
+  .banner { background: var(--card); border-left: 3px solid var(--accent); padding: 8px 12px; border-radius: 6px; margin-bottom: 12px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 14px; }
+  .card { background: var(--card); border-radius: 12px; padding: 16px 18px; border: 2px solid transparent;
+          box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+  .card.active { border-color: var(--accent); }
+  .card.clickable { cursor: pointer; }
+  .card.clickable:hover { border-color: var(--line); }
+  .head { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+  .name { font-weight: 600; font-size: 15px; }
+  .email { color: var(--muted); font-size: 12px; margin-left: auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tag { font-size: 11px; padding: 1px 7px; border-radius: 9px; background: var(--accent); color: #fff; }
+  .row { display: grid; grid-template-columns: 34px 1fr 46px; align-items: center; gap: 10px; margin: 8px 0 2px; }
+  .lbl { color: var(--muted); font-size: 12px; }
+  .bar { position: relative; height: 12px; border-radius: 6px; background: var(--track); overflow: hidden; }
+  .fill { height: 100%; border-radius: 6px; transition: width .4s; }
+  /* 时间刻度：窗口已过去的比例，用于对比用量节奏 */
+  .pace { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--text); opacity: .45; }
+  .pct { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+  .reset { margin-left: 44px; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .reset b { color: var(--text); font-weight: 500; }
+  .problem { color: var(--full); }
+  .foot { margin-top: 18px; color: var(--muted); font-size: 12px; }
+  .fresh { margin-top: 10px; color: var(--muted); font-size: 11px; }
+  .fresh.stale { color: var(--warn); }
+  .fresh.err { color: var(--full); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Claude 账户用量</h1>
+  <span class="meta" id="meta"></span>
+</header>
+<div id="banner"></div>
+<div class="grid" id="grid"></div>
+<div class="foot">点击非当前账户的卡片即可切换（会重启 Claude 桌面 app）。竖线表示当前窗口已过去的时间比例。数据每 15 秒刷新。</div>
+
+<script>
+// 页面数据来自同目录 api/state；倒计时每秒在本地更新，不额外请求。
+const SESSION_MS = 5 * 3600e3, WEEK_MS = 7 * 24 * 3600e3;
+let state = null, offset = 0; // offset: 服务器时间 - 本地时间，避免本机时钟偏差
+
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pad = n => String(n).padStart(2, '0');
+const now = () => Date.now() + offset;
+
+function color(pct) {
+  if (pct >= state.threshold) return 'var(--full)';
+  if (pct >= state.warnAt) return 'var(--warn)';
+  return 'var(--ok)';
+}
+
+// 绝对时间：今天只写 HH:MM，其它写 周X MM-DD HH:MM
+function absTime(d) {
+  const n = new Date(now()), hm = pad(d.getHours()) + ':' + pad(d.getMinutes());
+  if (d.toDateString() === n.toDateString()) return hm;
+  const wd = '日一二三四五六'[d.getDay()];
+  return `周${wd} ${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${hm}`;
+}
+
+function countdown(ms) {
+  if (ms <= 0) return '即将重置';
+  const m = Math.floor(ms / 60e3), d = Math.floor(m / 1440), h = Math.floor(m % 1440 / 60), mm = m % 60;
+  if (d > 0) return `${d}天${h}小时`;
+  if (h > 0) return `${h}小时${pad(mm)}分`;
+  return `${mm}分${pad(Math.floor(ms / 1000) % 60)}秒`;
+}
+
+function windowRow(label, w, spanMs) {
+  if (!w) return '';
+  const pct = Math.max(0, Math.min(100, w.pct));
+  let pace = '', reset = '<div class="reset">无重置时间（窗口未开始）</div>';
+  if (w.reset) {
+    const at = new Date(w.reset), left = at - now();
+    const elapsed = Math.max(0, Math.min(1, 1 - left / spanMs));
+    pace = `<div class="pace" style="left:calc(${(elapsed * 100).toFixed(1)}% - 1px)"></div>`;
+    const verb = pct >= state.threshold ? '可再用于' : '重置于';
+    reset = `<div class="reset">${verb} <b>${absTime(at)}</b> · 还剩 ${countdown(left)}</div>`;
+  }
+  return `<div class="row"><span class="lbl">${label}</span>
+    <div class="bar"><div class="fill" style="width:${pct}%;background:${color(pct)}"></div>${pace}</div>
+    <span class="pct">${Math.round(w.pct)}%</span></div>${reset}`;
+}
+
+// 数据新旧：显示"N 分钟前更新"，超过 staleAfter 标黄；查询失败时标红并写原因。
+function freshLine(a) {
+  if (!a.checkedAt && !a.error) return '';
+  const ago = a.checkedAt ? Math.max(0, Math.floor((now() - new Date(a.checkedAt)) / 60e3)) : null;
+  const agoText = ago === null ? '从未成功' : ago < 1 ? '刚刚更新' : `${ago} 分钟前更新`;
+  const stale = ago === null || ago * 60 > a.staleAfter;
+  const cls = a.error ? 'fresh err' : stale ? 'fresh stale' : 'fresh';
+  const tail = a.error ? ` · 查询失败：${esc(a.error)}` : stale ? ' · 数据可能已过期' : '';
+  return `<div class="${cls}">${agoText}${tail}</div>`;
+}
+
+function render() {
+  if (!state) return;
+  const banner = [state.status, state.note].filter(Boolean).map(t => `<div class="banner">${esc(t)}</div>`).join('');
+  document.getElementById('banner').innerHTML = banner + (state.busy ? '<div class="banner">正在切换…</div>' : '');
+  document.getElementById('meta').textContent =
+    `阈值 ${state.threshold}% · 自动切换${state.autoSwitch ? '开' : '关'} · 更新于 ${new Date(state.now).toLocaleTimeString()}`;
+  const grid = document.getElementById('grid');
+  if (!state.accounts.length) { grid.innerHTML = '<div class="card">还没有账户，请先在 Claude 中登录。</div>'; return; }
+  grid.innerHTML = state.accounts.map(a => {
+    const can = !a.active && !state.busy;
+    let body;
+    if (a.problem) body = `<div class="problem">${esc(a.problem)}</div>`;
+    else if (!a.session) body = '<div class="reset" style="margin:0">用量未知</div>';
+    else body = windowRow('5h', a.session, SESSION_MS) + windowRow('周', a.weekly, WEEK_MS);
+    body += freshLine(a);
+    return `<div class="card${a.active ? ' active' : ''}${can ? ' clickable' : ''}" data-uuid="${esc(a.uuid)}" data-name="${esc(a.label)}">
+      <div class="head"><span class="name">${esc(a.label)}</span>${a.active ? '<span class="tag">当前</span>' : ''}
+      <span class="email">${esc(a.email || '')}</span></div>${body}</div>`;
+  }).join('');
+}
+
+async function load() {
+  try {
+    const r = await fetch('api/state', {cache: 'no-store'});
+    if (!r.ok) throw new Error(r.status);
+    state = await r.json();
+    offset = new Date(state.now) - Date.now();
+    render();
+  } catch (e) {
+    document.getElementById('meta').textContent = '连接失败，switcher 可能已退出';
+  }
+}
+
+document.getElementById('grid').addEventListener('click', async e => {
+  const card = e.target.closest('.card.clickable');
+  if (!card || !confirm(`切换到 ${card.dataset.name}？Claude 桌面 app 会重启。`)) return;
+  const r = await fetch('api/switch', {method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({uuid: card.dataset.uuid})});
+  if (!r.ok) alert('切换失败：' + (await r.text()));
+  load();
+});
+
+// 原生窗口里 Esc 隐藏窗口（hideDashboard 由 WebView2 注入，浏览器里不存在）
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && typeof window.hideDashboard === 'function') window.hideDashboard();
+});
+
+load();
+setInterval(load, 15000);
+setInterval(render, 1000);
+</script>
+</body>
+</html>

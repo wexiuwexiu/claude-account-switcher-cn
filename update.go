@@ -58,7 +58,17 @@ func latestRelease(ctx context.Context) (string, error) {
 }
 
 // parseVersion splits "1.2.3" into its numbers, nil when v is not a version.
+// 支持本地改版后缀 "-wexiu.N"：作为第 4 段参与比较，0.3.3 < 0.3.3-wexiu.1 < 0.3.4。
+// 其它后缀（如 -beta）仍视为无效，保持原逻辑。
 func parseVersion(v string) []int {
+	build := 0
+	if base, n, ok := strings.Cut(v, "-wexiu."); ok {
+		b, err := strconv.Atoi(n)
+		if err != nil || b < 1 {
+			return nil
+		}
+		v, build = base, b
+	}
 	parts := strings.Split(v, ".")
 	if len(parts) != 3 {
 		return nil
@@ -71,7 +81,7 @@ func parseVersion(v string) []int {
 		}
 		nums[i] = n
 	}
-	return nums
+	return append(nums, build)
 }
 
 // newerVersion says whether version a comes after version b.
@@ -114,7 +124,7 @@ func (s *switcher) checkUpdate(ctx context.Context) {
 
 var (
 	releasesURL = repoURL + "/releases"
-	downloader  = &http.Client{Timeout: 5 * time.Minute}
+	downloader  = &http.Client{Timeout: 5 * time.Minute, Transport: proxyTransport}
 	updating    atomic.Bool
 )
 

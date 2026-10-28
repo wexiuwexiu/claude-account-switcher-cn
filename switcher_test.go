@@ -275,6 +275,24 @@ func TestUsageTextShowsWeeklyReset(t *testing.T) {
 	}
 }
 
+// 5h 窗口的重置时间不论用量多少都要显示，满额时写 until。
+func TestUsageTextShowsSessionReset(t *testing.T) {
+	now := time.Date(2026, 10, 6, 12, 0, 0, 0, time.Local)
+	a := Account{Usage: &Usage{Session: 1, SessionReset: now.Add(3 * time.Hour), Weekly: 40}}
+	if got, want := usageText(a, 96, now), "5h 1%, resets 15:00 · week 40%"; got != want {
+		t.Fatalf("got %q, want %q", got, want)
+	}
+	a.Usage.Session = 100
+	if got, want := usageText(a, 96, now), "5h 100% until 15:00 · week 40%"; got != want {
+		t.Fatalf("got %q, want %q", got, want)
+	}
+	// 重置时间已过：current() 把用量清零，不再显示过期时间。
+	a.Usage.SessionReset = now.Add(-time.Minute)
+	if got, want := usageText(a, 96, now), "5h 0% · week 40%"; got != want {
+		t.Fatalf("got %q, want %q", got, want)
+	}
+}
+
 func TestSpendWeeklyWaitsAndComesBack(t *testing.T) {
 	now := time.Now()
 	idle := now.Add(-time.Hour)

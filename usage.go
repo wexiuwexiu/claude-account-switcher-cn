@@ -66,7 +66,14 @@ func (p profile) plan() string {
 	return ""
 }
 
-var client = &http.Client{Timeout: 15 * time.Second}
+// proxyTransport 让所有请求（用量、更新检查、下载）走系统代理，见 proxy_windows.go。
+var proxyTransport = func() *http.Transport {
+	t := http.DefaultTransport.(*http.Transport).Clone()
+	t.Proxy = proxyFunc
+	return t
+}()
+
+var client = &http.Client{Timeout: 15 * time.Second, Transport: proxyTransport}
 
 func apiGet(ctx context.Context, token, path string, out any) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiBase+path, nil)

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net"
 	"os"
 	"path/filepath"
 	"sync"
@@ -109,11 +110,13 @@ type switcher struct {
 	// After a 429, an account is not asked again before its backoff ends.
 	backoff map[string]time.Time
 	strikes map[string]int
+	// errs 记录每个账户最近一次用量查询失败的原因，成功后清除；仪表盘显示用。
+	errs map[string]string
 }
 
 func newSwitcher(dir string) *switcher {
 	s := &switcher{dir: dir, st: State{Threshold: defaultThreshold}, onChange: func() {},
-		backoff: map[string]time.Time{}, strikes: map[string]int{}}
+		backoff: map[string]time.Time{}, strikes: map[string]int{}, errs: map[string]string{}}
 	if data, err := os.ReadFile(s.statePath()); err == nil {
 		_ = json.Unmarshal(data, &s.st)
 	}
@@ -244,6 +247,11 @@ func (s *switcher) check(ctx context.Context) (string, func() error) {
 			log.Printf("usage %s: rate limited, next try in %s", j.uuid[:8], wait)
 		} else if err == nil {
 			delete(s.strikes, j.uuid)
+		}
+		if err == nil {
+			delete(s.errs, j.uuid)
+		} else {
+			s.errs[j.uuid] = usageErrText(err, s.backoff[j.uuid])
 		}
 		a := s.account(j.uuid)
 		if j.new && err == nil {
@@ -537,13 +545,18 @@ type snapshot struct {
 	Busy        bool
 	// Update is a version newer than this one, empty while there is none.
 	Update string
+	// Errs 是各账户最近一次用量查询失败的原因（键为 UUID）。
+	Errs map[string]string
 }
 
 func (s *switcher) snapshot() snapshot {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	snap := snapshot{Active: s.active, AutoSwitch: s.st.AutoSwitch, SpendWeekly: s.st.SpendWeekly, Threshold: s.st.Threshold,
-		Status: s.status, Note: s.autoNote(time.Now()), Busy: s.busy.Load()}
+		Status: s.status, Note: s.autoNote(time.Now()), Busy: s.busy.Load(), Errs: map[string]string{}}
+	for k, v := range s.errs {
+		snap.Errs[k] = v
+	}
 	if !s.st.NoUpdateCheck && newerVersion(s.st.LatestVersion, version) {
 		snap.Update = s.st.LatestVersion
 	}
@@ -577,4 +590,23 @@ func (s *switcher) adding() bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return !s.addingAt.IsZero()
+}
+
+// usageErrText 把用量查询错误转成仪表盘上能看懂的一句话。
+func usageErrText(err error, retryAt time.Time) string {
+	var limited *rateLimited
+	var nerr net.Error
+	switch {
+	case errors.As(err, &limited):
+		return "被限流，" + retryAt.Format("15:04") + " 后重试"
+	case errors.Is(err, errSignedOut):
+		return "登录已过期，需要重新添加"
+	case errors.Is(err, context.DeadlineExceeded), errors.As(err, &nerr) && nerr.Timeout():
+		return "连接超时（检查代理/网络）"
+	}
+	msg := err.Error()
+	if len(msg) > 80 {
+		msg = msg[:80] + "…"
+	}
+	return msg
 }
