@@ -30,7 +30,7 @@
   /* ---- 大标题 ---- */
   .header { display: flex; align-items: flex-start; gap: 12px; padding: 8px 2px 10px; }
   .title h1 { margin: 0; font-size: 28px; font-weight: 700; letter-spacing: -.02em; line-height: 1.15; }
-  .title .meta { margin-top: 3px; font-size: 13px; color: var(--label2); }
+  .title .meta { margin-top: 3px; font-size: 14px; color: var(--label2); }
   .title .meta .on { color: var(--green); font-weight: 600; }
   .tools { margin-left: auto; display: flex; gap: 8px; padding-top: 4px; }
   .ibtn { width: 32px; height: 32px; border: 0; border-radius: 50%; background: var(--fill); color: var(--label2);
@@ -42,12 +42,12 @@
 
   /* ---- 顶部提示（状态 / 错误） ---- */
   .toast { display: flex; align-items: center; gap: 8px; background: var(--card); border-radius: 14px; padding: 10px 14px;
-           margin-bottom: 12px; font-size: 14px; box-shadow: var(--shadow); }
+           margin-bottom: 12px; font-size: 15px; box-shadow: var(--shadow); }
   .toast i { width: 8px; height: 8px; border-radius: 50%; background: var(--blue); flex: none; }
   .toast.err i { background: var(--red); }
 
   /* ---- 分组标题与卡片 ---- */
-  .caption { font-size: 13px; color: var(--label2); padding: 0 16px 6px; letter-spacing: .02em; }
+  .caption { font-size: 14px; color: var(--label2); padding: 0 16px 6px; letter-spacing: .02em; }
   .group { background: var(--card); border-radius: 20px; box-shadow: var(--shadow); overflow: hidden; margin-bottom: 16px; }
 
   /* ---- 当前账户：活动圆环 + 两个窗口 ---- */
@@ -56,33 +56,33 @@
   .rings svg { width: 100%; height: 100%; transform: rotate(-90deg); }
   .rings .center { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; }
   .rings .center b { font-size: 30px; font-weight: 700; letter-spacing: -.02em; line-height: 1; }
-  .rings .center span { font-size: 12px; color: var(--label2); margin-top: 3px; }
+  .rings .center span { font-size: 13px; color: var(--label2); margin-top: 3px; }
   .track { fill: none; opacity: .18; }
   .prog { fill: none; stroke-linecap: round; }
   .intro .prog { animation: draw .9s cubic-bezier(.2,.8,.2,1) both; }
   @keyframes draw { from { stroke-dashoffset: 100; } }
 
   .who { display: flex; align-items: center; gap: 8px; min-width: 0; }
-  .hmail { font-size: 13px; color: var(--label2); margin: 1px 0 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .hmail { font-size: 14px; color: var(--label2); margin: 1px 0 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .who .name { font-size: 21px; font-weight: 700; letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .pill { flex: none; font-size: 12px; font-weight: 600; padding: 2px 9px; border-radius: 999px; }
+  .pill { flex: none; font-size: 13px; font-weight: 600; padding: 2px 9px; border-radius: 999px; }
   .pill.blue { background: var(--blue); color: #fff; }
   .pill.green { background: color-mix(in srgb, var(--green) 16%, transparent); color: var(--green); }
   .pill.orange { background: color-mix(in srgb, var(--orange) 16%, transparent); color: var(--orange); }
   .pill.gray { background: var(--fill); color: var(--label2); }
-  .who .fresh { margin-left: auto; display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--label2); flex: none; }
+  .who .fresh { margin-left: auto; display: flex; align-items: center; gap: 5px; font-size: 13px; color: var(--label2); flex: none; }
   .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); }
   .dot.stale { background: var(--orange); } .dot.err { background: var(--red); }
 
   .stat + .stat { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--sep); }
   .stat .top { display: flex; align-items: baseline; gap: 8px; }
-  .stat .key { display: flex; align-items: center; gap: 7px; font-size: 14px; font-weight: 600; }
+  .stat .key { display: flex; align-items: center; gap: 7px; font-size: 15px; font-weight: 600; }
   .stat .key i { width: 10px; height: 10px; border-radius: 50%; }
   .stat .val { margin-left: auto; font-size: 22px; font-weight: 700; letter-spacing: -.01em; }
-  .stat .when { font-size: 13px; color: var(--label2); margin-top: 1px; }
+  .stat .when { font-size: 14px; color: var(--label2); margin-top: 1px; }
   .stat .when b { color: var(--orange); font-weight: 600; }
   /* 用量速度预测：按本窗口至今的平均速度推算何时用满 */
-  .stat .eta { font-size: 13px; margin-top: 2px; color: var(--label2); }
+  .stat .eta { font-size: 14px; margin-top: 2px; color: var(--label2); }
   .stat .eta.warn { color: var(--orange); font-weight: 600; }
   .stat .eta.ok { color: var(--green); }
   .problem { padding: 16px 20px; color: var(--label2); font-size: 14px; }
@@ -100,23 +100,23 @@
   .info { min-width: 0; }
   .info .l1 { display: flex; align-items: center; gap: 7px; min-width: 0; }
   .info .nm { flex: none; max-width: 45%; font-size: 16px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .info .mail { min-width: 0; font-size: 13px; color: var(--label2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .info .mail { min-width: 0; font-size: 14px; color: var(--label2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .info .l1 .pill { flex: none; }
-  .info .l2 { font-size: 13px; color: var(--label2); margin-top: 3px; line-height: 1.45; font-variant-numeric: tabular-nums; }
+  .info .l2 { font-size: 14px; color: var(--label2); margin-top: 3px; line-height: 1.45; font-variant-numeric: tabular-nums; }
   .info .l2 b { color: var(--orange); font-weight: 600; }
-  .info .l2 .k { display: inline-block; width: 30px; color: var(--label3); }
-  .info .why { font-size: 13px; color: var(--blue); margin-top: 3px; }
+  .info .l2 .k { display: inline-block; width: 34px; color: var(--label3); }
+  .info .why { font-size: 14px; color: var(--blue); margin-top: 3px; }
   .minis { display: flex; gap: 10px; }
-  .mini { width: 42px; text-align: center; }
-  .mini .ring { position: relative; width: 42px; height: 42px; }
+  .mini { width: 46px; text-align: center; }
+  .mini .ring { position: relative; width: 46px; height: 46px; }
   .mini svg { width: 100%; height: 100%; transform: rotate(-90deg); }
-  .mini .pct { position: absolute; inset: 0; display: grid; place-items: center; font-size: 12px; font-weight: 700; }
-  .mini .lab { font-size: 11px; color: var(--label3); margin-top: 2px; }
+  .mini .pct { position: absolute; inset: 0; display: grid; place-items: center; font-size: 13px; font-weight: 700; }
+  .mini .lab { font-size: 12px; color: var(--label3); margin-top: 2px; }
   .chev { color: var(--label3); }
   .chev svg { width: 8px; height: 13px; display: block; }
 
   /* ---- 需要注意：只在异常时出现 ---- */
-  .alert { display: grid; grid-template-columns: 26px 1fr; gap: 10px; align-items: start; padding: 11px 16px; font-size: 14px; }
+  .alert { display: grid; grid-template-columns: 26px 1fr; gap: 10px; align-items: start; padding: 11px 16px; font-size: 15px; }
   .alert + .alert { border-top: 1px solid var(--sep); }
   .alert .ic { width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; color: #fff; font-weight: 700; font-size: 14px; }
   .alert.stale .ic { background: var(--orange); } .alert.err .ic { background: var(--red); }
@@ -124,7 +124,7 @@
   .alert .tx span { color: var(--label2); }
 
   .empty { padding: 30px 20px; text-align: center; color: var(--label2); }
-  .foot { text-align: center; font-size: 12px; color: var(--label3); margin-top: -8px; }
+  .foot { text-align: center; font-size: 13px; color: var(--label3); margin-top: -8px; }
 
   /* ---- 切换确认：iOS 操作表 ---- */
   .sheet-wrap { position: absolute; inset: 0; background: var(--dim); display: flex; flex-direction: column; justify-content: flex-end;
@@ -132,8 +132,8 @@
   .sheet-wrap.hide { display: none; }
   .sheet { background: var(--sheet); border-radius: 16px; overflow: hidden; backdrop-filter: blur(20px); text-align: center;
            animation: up .26s cubic-bezier(.2,.9,.25,1) both; }
-  .sheet .msg { padding: 14px 18px 12px; font-size: 13px; color: var(--label2); border-bottom: 1px solid var(--sep); }
-  .sheet .msg b { display: block; font-size: 15px; color: var(--label); margin-bottom: 3px; }
+  .sheet .msg { padding: 14px 18px 12px; font-size: 14px; color: var(--label2); border-bottom: 1px solid var(--sep); }
+  .sheet .msg b { display: block; font-size: 16px; color: var(--label); margin-bottom: 3px; }
   .sheet button { display: block; width: 100%; border: 0; background: transparent; padding: 15px; font: inherit; font-size: 18px; color: var(--blue); cursor: pointer; }
   .sheet button:active { background: var(--fill-press); }
   .sheet.cancel { margin-top: 8px; animation-delay: .03s; }
