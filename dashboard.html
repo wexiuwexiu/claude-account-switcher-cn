@@ -17,13 +17,14 @@
             --accent-line: rgba(109,147,255,.55); --shadow: none; --btn: rgba(255,255,255,.07); --btn-hover: rgba(255,255,255,.12); }
   }
   * { box-sizing: border-box; }
-  html, body { margin: 0; overflow-x: hidden; }
+  html, body { margin: 0; overflow-x: hidden; scrollbar-width: none; }
+  ::-webkit-scrollbar { display: none; }
   body { background: var(--bg); color: var(--text); -webkit-font-smoothing: antialiased; user-select: none;
          font: 14px/1.45 "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", "Microsoft YaHei", system-ui, sans-serif; }
-  #app { padding: 0 16px 14px; }
+  #app { padding: 0 14px 10px; }
 
   /* 页面自带标题栏（原生窗口没有系统标题栏） */
-  .titlebar { display: flex; align-items: center; gap: 10px; height: 52px; }
+  .titlebar { display: flex; align-items: center; gap: 10px; height: 44px; }
   .logo { width: 22px; height: 22px; border-radius: 50%; border: 3px solid var(--track); border-top-color: var(--ok); border-right-color: var(--ok); }
   h1 { font-size: 15px; margin: 0; font-weight: 600; }
   .chips { display: flex; gap: 6px; margin-left: 4px; }
@@ -36,50 +37,51 @@
   .ibtn.on { color: var(--accent); background: var(--accent-soft); }
   .ibtn svg { width: 16px; height: 16px; }
 
-  .banner { background: var(--accent-soft); color: var(--text); padding: 8px 12px; border-radius: 10px; margin-bottom: 10px; font-size: 13px; }
+  .banner { background: var(--accent-soft); color: var(--text); padding: 8px 12px; border-radius: 10px; margin-bottom: 8px; font-size: 13px; }
   .banner.err { background: rgba(229,72,77,.1); }
-  .list { display: flex; flex-direction: column; gap: 10px; }
+  .list { display: flex; flex-direction: column; gap: 8px; }
 
-  .card { background: var(--card); border-radius: 12px; padding: 14px 16px 12px; box-shadow: var(--shadow);
+  .card { background: var(--card); border-radius: 12px; padding: 10px 14px 10px; box-shadow: var(--shadow);
           outline: 1.5px solid transparent; outline-offset: -1.5px; transition: outline-color .15s, background .15s; }
   .card.active { outline-color: var(--accent-line); background: linear-gradient(var(--accent-soft), var(--accent-soft)), var(--card); }
   .card.clickable { cursor: pointer; }
   .card.clickable:hover { background: var(--card-hover); outline-color: var(--line); }
   .card.clickable:hover .go { opacity: 1; transform: none; }
+  /* "切换 →" 不占位：平时隐藏，悬停时替换右上角的更新时间，保证各卡片对齐 */
+  .go { display: none; } .card.clickable:hover .go { display: inline; } .card.clickable:hover .fresh { display: none; }
 
-  .head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; min-width: 0; }
-  .avatar { flex: none; width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center;
+  .head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; min-width: 0; }
+  .avatar { flex: none; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center;
             font-size: 14px; font-weight: 600; color: #fff; }
   .who { min-width: 0; flex: 1; }
   .line1 { display: flex; align-items: center; gap: 6px; min-width: 0; }
   .name { font-weight: 600; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .email { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .email { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1.3; }
   .tag { flex: none; font-size: 11px; font-weight: 600; padding: 1px 8px; border-radius: 999px; background: var(--accent); color: #fff; }
   .plan { flex: none; font-size: 11px; color: var(--muted); background: var(--btn); padding: 0 6px; border-radius: 5px; }
-  .side { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; font-size: 12px; color: var(--muted); }
+  .side { flex: none; display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
   .fresh { display: flex; align-items: center; gap: 5px; }
   .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
   .dot.stale { background: var(--warn); } .dot.err { background: var(--full); }
   .login { font-size: 11px; } .login.stale { color: var(--warn); } .login.err { color: var(--full); }
   .go { opacity: 0; transform: translateX(-3px); color: var(--accent); font-weight: 600; transition: opacity .15s, transform .15s; }
 
-  .row { display: grid; grid-template-columns: 22px 1fr 44px; align-items: center; column-gap: 10px; }
-  .row + .row { margin-top: 8px; }
+  .row { display: grid; grid-template-columns: 18px 1fr 36px 118px; align-items: center; column-gap: 8px; }
+  .row + .row { margin-top: 5px; }
   .lbl { color: var(--muted); font-size: 12px; }
   .bar { position: relative; height: 8px; border-radius: 4px; background: var(--track); overflow: hidden; }
   .fill { height: 100%; border-radius: 4px; transition: width .4s; }
   /* 竖线：当前窗口已过去的时间比例，用量条超过它说明用得比时间快 */
   .pace { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--text); opacity: .3; }
-  .pct { text-align: right; font-weight: 600; font-size: 14px; font-variant-numeric: tabular-nums; }
-  .when { grid-column: 2 / 4; display: flex; justify-content: space-between; margin-top: 3px;
-          color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .pct { text-align: right; font-weight: 600; font-size: 13px; font-variant-numeric: tabular-nums; }
+  .when { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .when b { color: var(--text); font-weight: 500; }
-  .note { font-size: 12px; color: var(--muted); margin-top: 8px; }
+  .note { font-size: 12px; color: var(--muted); margin-top: 5px; }
   .note.err { color: var(--full); } .note.stale { color: var(--warn); }
-  .problem { color: var(--muted); font-size: 13px; background: var(--btn); border-radius: 8px; padding: 8px 10px; }
+  .problem { color: var(--muted); font-size: 12px; background: var(--btn); border-radius: 8px; padding: 6px 10px; }
 
   /* 卡片内的切换确认（替代系统 confirm 弹窗，弹窗会让面板失焦隐藏） */
-  .confirm { display: flex; align-items: center; gap: 8px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); font-size: 13px; }
+  .confirm { display: flex; align-items: center; gap: 8px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); font-size: 13px; }
   .confirm span { flex: 1; color: var(--muted); }
   .btn { border: 0; border-radius: 8px; padding: 6px 14px; font: inherit; font-size: 13px; cursor: pointer; background: var(--btn); color: var(--text); }
   .btn:hover { background: var(--btn-hover); }
@@ -87,7 +89,7 @@
   .btn.primary:hover { filter: brightness(1.08); }
 
   .empty { text-align: center; color: var(--muted); padding: 28px 0; }
-  .foot { margin-top: 12px; color: var(--faint); font-size: 12px; display: flex; justify-content: space-between; }
+  .foot { margin-top: 8px; color: var(--faint); font-size: 12px; display: flex; justify-content: space-between; }
 </style>
 </head>
 <body>
@@ -150,20 +152,30 @@ function countdown(ms) {
   return `${mm} 分钟`;
 }
 
+// 短倒计时："1时05分" / "3天4时"，放在同一行里
+function shortLeft(ms) {
+  const m = Math.max(0, Math.ceil(ms / 60e3)), d = Math.floor(m / 1440), h = Math.floor(m % 1440 / 60);
+  if (d > 0) return `${d}天${h}时`;
+  if (h > 0) return `${h}时${pad(m % 60)}分`;
+  return `${m}分`;
+}
+
+// 一行：标签 | 进度条 | 百分比 | 重置时间。完整倒计时放在 title 里，悬停可见。
 function windowRow(label, w, spanMs) {
   if (!w) return '';
   const pct = Math.max(0, Math.min(100, w.pct));
-  let pace = '', when = '<div class="when"><span>窗口未开始</span></div>';
+  let pace = '', when = '<span class="when">未开始</span>';
   if (w.reset) {
     const at = new Date(w.reset), left = at - now();
     const elapsed = Math.max(0, Math.min(1, 1 - left / spanMs));
     pace = `<div class="pace" style="left:calc(${(elapsed * 100).toFixed(1)}% - 1px)"></div>`;
-    const verb = pct >= state.threshold ? '可再用于' : '重置于';
-    when = `<div class="when"><span>${verb} <b>${absTime(at)}</b></span><span>还剩 ${countdown(left)}</span></div>`;
+    const full = pct >= state.threshold ? '可再用于 ' : '重置于 ';
+    const text = spanMs === SESSION_MS ? `${absTime(at)} · ${shortLeft(left)}` : absTime(at);
+    when = `<span class="when" title="${full}${absTime(at)}，还剩 ${countdown(left)}">${pct >= state.threshold ? '<b>' + text + '</b>' : text}</span>`;
   }
   return `<div class="row"><span class="lbl">${label}</span>
     <div class="bar"><div class="fill" style="width:${pct}%;background:${color(pct)}"></div>${pace}</div>
-    <span class="pct">${Math.round(w.pct)}%</span><span></span>${when}</div>`;
+    <span class="pct">${Math.round(w.pct)}%</span>${when}</div>`;
 }
 
 // 数据新旧：右上角圆点（绿/黄/红）+ "N分钟前"；过期或失败时在卡片底部写原因。
@@ -231,9 +243,9 @@ function render() {
         <span class="avatar" style="background:${AVATAR[i % AVATAR.length]}">${esc((name || '?').slice(0, 1).toUpperCase())}</span>
         <div class="who">
           <div class="line1"><span class="name">${esc(name)}</span>${plan ? `<span class="plan">${esc(plan)}</span>` : ''}${a.active ? '<span class="tag">当前</span>' : ''}</div>
-          <div class="email">${esc(a.email || '')}</div>
+          <div class="email">${esc(a.email || '')}${l.side ? ' · ' + l.side : ''}</div>
         </div>
-        <div class="side">${a.problem ? '' : f.side}${l.side}${can && confirming !== a.uuid ? '<span class="go">切换 →</span>' : ''}</div>
+        <div class="side">${a.problem ? '' : f.side}${can && confirming !== a.uuid ? '<span class="go">切换 →</span>' : ''}</div>
       </div>${body}</div>`;
   }).join('');
   fit();
