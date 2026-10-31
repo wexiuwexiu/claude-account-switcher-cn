@@ -25,10 +25,10 @@
   body { background: var(--bg); color: var(--label); -webkit-font-smoothing: antialiased; user-select: none;
          font: 15px/1.4 "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", system-ui, sans-serif; }
   .num { font-family: "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif; font-variant-numeric: tabular-nums; }
-  #app { padding: 6px 16px 14px; position: relative; }
+  #app { padding: 4px 16px 12px; position: relative; }
 
   /* ---- 大标题 ---- */
-  .header { display: flex; align-items: flex-start; gap: 12px; padding: 10px 2px 14px; }
+  .header { display: flex; align-items: flex-start; gap: 12px; padding: 8px 2px 10px; }
   .title h1 { margin: 0; font-size: 28px; font-weight: 700; letter-spacing: -.02em; line-height: 1.15; }
   .title .meta { margin-top: 3px; font-size: 13px; color: var(--label2); }
   .title .meta .on { color: var(--green); font-weight: 600; }
@@ -48,11 +48,11 @@
 
   /* ---- 分组标题与卡片 ---- */
   .caption { font-size: 13px; color: var(--label2); padding: 0 16px 6px; letter-spacing: .02em; }
-  .group { background: var(--card); border-radius: 20px; box-shadow: var(--shadow); overflow: hidden; margin-bottom: 22px; }
+  .group { background: var(--card); border-radius: 20px; box-shadow: var(--shadow); overflow: hidden; margin-bottom: 16px; }
 
   /* ---- 当前账户：活动圆环 + 两个窗口 ---- */
-  .hero { display: grid; grid-template-columns: 132px 1fr; gap: 18px; align-items: center; padding: 18px 20px; }
-  .rings { position: relative; width: 132px; height: 132px; }
+  .hero { display: grid; grid-template-columns: 124px 1fr; gap: 18px; align-items: center; padding: 16px 20px; }
+  .rings { position: relative; width: 124px; height: 124px; }
   .rings svg { width: 100%; height: 100%; transform: rotate(-90deg); }
   .rings .center { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; }
   .rings .center b { font-size: 30px; font-weight: 700; letter-spacing: -.02em; line-height: 1; }
@@ -62,7 +62,8 @@
   .intro .prog { animation: draw .9s cubic-bezier(.2,.8,.2,1) both; }
   @keyframes draw { from { stroke-dashoffset: 100; } }
 
-  .who { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; min-width: 0; }
+  .who { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .hmail { font-size: 13px; color: var(--label2); margin: 1px 0 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .who .name { font-size: 21px; font-weight: 700; letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .pill { flex: none; font-size: 12px; font-weight: 600; padding: 2px 9px; border-radius: 999px; }
   .pill.blue { background: var(--blue); color: #fff; }
@@ -80,11 +81,15 @@
   .stat .val { margin-left: auto; font-size: 22px; font-weight: 700; letter-spacing: -.01em; }
   .stat .when { font-size: 13px; color: var(--label2); margin-top: 1px; }
   .stat .when b { color: var(--orange); font-weight: 600; }
+  /* 用量速度预测：按本窗口至今的平均速度推算何时用满 */
+  .stat .eta { font-size: 13px; margin-top: 2px; color: var(--label2); }
+  .stat .eta.warn { color: var(--orange); font-weight: 600; }
+  .stat .eta.ok { color: var(--green); }
   .problem { padding: 16px 20px; color: var(--label2); font-size: 14px; }
 
   /* ---- 其他账户：分组列表 ---- */
   .row { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto 14px; align-items: center; column-gap: 12px;
-         padding: 12px 14px 12px 16px; position: relative; cursor: pointer; transition: background .12s; }
+         padding: 11px 14px 11px 16px; position: relative; cursor: pointer; transition: background .12s; }
   .row:hover { background: color-mix(in srgb, var(--fill) 50%, transparent); }
   .row:active { background: var(--fill-press); }
   .row.disabled { cursor: default; }
@@ -94,7 +99,9 @@
             font-size: 17px; font-weight: 600; box-shadow: inset 0 0 0 .5px rgba(0,0,0,.08); }
   .info { min-width: 0; }
   .info .l1 { display: flex; align-items: center; gap: 7px; min-width: 0; }
-  .info .nm { font-size: 16px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .info .nm { flex: none; max-width: 45%; font-size: 16px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .info .mail { min-width: 0; font-size: 13px; color: var(--label2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .info .l1 .pill { flex: none; }
   .info .l2 { font-size: 13px; color: var(--label2); margin-top: 3px; line-height: 1.45; font-variant-numeric: tabular-nums; }
   .info .l2 b { color: var(--orange); font-weight: 600; }
   .info .l2 .k { display: inline-block; width: 30px; color: var(--label3); }
@@ -143,7 +150,7 @@
   </div>
   <div id="toasts"></div>
   <div id="main"></div>
-  <div class="foot">点按账户切换 · 悬停查看邮箱与登录有效期</div>
+  <div class="foot">点按账户切换 · 悬停查看登录有效期</div>
   <div class="sheet-wrap hide" id="sheet"></div>
 </div>
 
@@ -282,6 +289,25 @@ function avatar(a, name) {
   return `<span class="avatar" style="background:linear-gradient(160deg,${c1},${c2})">${esc((name || '?').slice(0, 1).toUpperCase())}</span>`;
 }
 
+// 5 小时窗口的速度预测：按窗口开始至今的平均速度，推算何时用满。
+// 窗口刚开始（< 15 分钟）或用量很低时样本太少，不预测。
+function forecast(w) {
+  if (!w || !w.reset || w.pct >= state.threshold) return '';
+  const left = new Date(w.reset) - now(), elapsed = SESSION_MS - left;
+  if (elapsed < 15 * 60e3 || w.pct < 5) return '';
+  const rate = w.pct / elapsed;                       // 每毫秒的百分比
+  const toFull = (state.threshold - w.pct) / rate;    // 到阈值还需多久
+  if (toFull >= left) return `<div class="eta ok">按目前速度，重置前用不完</div>`;
+  // 一定在 5 小时内，只写时分；提前量用短格式，保证一行放得下
+  const at = new Date(now() + toFull), early = Math.round((left - toFull) / 60e3);
+  const hm = pad(at.getHours()) + ':' + pad(at.getMinutes());
+  const short = early >= 60 ? `${Math.floor(early / 60)} 时 ${early % 60} 分` : `${early} 分`;
+  return `<div class="eta warn">按目前速度约 ${hm} 用满，比重置早 ${short}</div>`;
+}
+
+// 账户套餐是否不全一样：一样就不在每行重复显示
+const mixedPlans = () => new Set(state.accounts.map(a => splitLabel(a.label)[1])).size > 1;
+
 // 某个窗口的重置描述：被用满时写"恢复"并标橙
 function whenText(w, withCountdown) {
   if (!w) return '';
@@ -294,18 +320,19 @@ function whenText(w, withCountdown) {
 function heroCard(a) {
   const [name, plan] = splitLabel(a.label), f = freshDot(a);
   const head = `<div class="who"><span class="name">${esc(name)}</span><span class="pill blue">当前</span>
-    ${plan ? `<span class="pill gray">${esc(plan)}</span>` : ''}<span class="fresh"><span class="dot ${f.cls}"></span>${f.text}</span></div>`;
+    ${plan ? `<span class="pill gray">${esc(plan)}</span>` : ''}<span class="fresh"><span class="dot ${f.cls}"></span>${f.text}</span></div>
+    <div class="hmail">${esc(a.email || '')}</div>`;
   if (a.problem || !a.session) {
     return `<div class="group" title="${esc(hoverText(a, plan))}"><div class="problem">${head}${esc(a.problem ? (PROBLEM_ZH[a.problem] || a.problem) : '用量未知')}</div></div>`;
   }
   const s = a.session, w = a.weekly || {pct: 0};
   const cs = tone(s.pct, 'session'), cw = tone(w.pct, 'week');
-  const stat = (key, color, win) => `<div class="stat"><div class="top"><span class="key"><i style="background:${color}"></i>${key}</span>
-      <span class="val num">${Math.round(win.pct)}%</span></div><div class="when">${whenText(win, true)}</div></div>`;
+  const stat = (key, color, win, extra) => `<div class="stat"><div class="top"><span class="key"><i style="background:${color}"></i>${key}</span>
+      <span class="val num">${Math.round(win.pct)}%</span></div><div class="when">${whenText(win, true)}</div>${extra || ''}</div>`;
   return `<div class="group" title="${esc(hoverText(a, plan))}"><div class="hero">
     <div class="rings"><svg viewBox="0 0 100 100">${ring(43, 11, s.pct, cs)}${ring(29.5, 11, w.pct, cw)}</svg>
       <div class="center"><b class="num">${Math.round(s.pct)}%</b><span>5 小时</span></div></div>
-    <div>${head}${stat('5 小时', cs, s)}${a.weekly ? stat('本周', cw, a.weekly) : ''}</div></div></div>`;
+    <div>${head}${stat('5 小时', cs, s, forecast(s))}${a.weekly ? stat('本周', cw, a.weekly) : ''}</div></div></div>`;
 }
 
 function miniRing(label, w, base) {
@@ -325,7 +352,7 @@ function accRow(a, rec) {
   else l2 = `<span class="k">5 时</span>${whenText(a.session)}<br><span class="k">本周</span>${whenText(a.weekly)}`;
   return `<div class="row${isRec ? ' rec' : ''}${can ? '' : ' disabled'}" data-uuid="${esc(a.uuid)}" title="${esc(hoverText(a, plan))}">
     ${avatar(a, name)}
-    <div class="info"><div class="l1"><span class="nm">${esc(name)}</span>${pill}</div>
+    <div class="info"><div class="l1"><span class="nm">${esc(name)}</span>${pill}${mixedPlans() && plan ? `<span class="pill gray">${esc(plan)}</span>` : ''}<span class="mail">${esc(a.email || '')}</span></div>
       <div class="l2">${l2}</div>${isRec ? `<div class="why">${esc(rec.why)}</div>` : ''}</div>
     <div class="minis">${miniRing('5 时', a.session, 'session')}${miniRing('本周', a.weekly, 'week')}</div>
     <span class="chev">${ICON.chev}</span></div>`;
