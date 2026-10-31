@@ -60,6 +60,9 @@ type State struct {
 	SpendUntil time.Time `json:"spendUntil,omitempty"`
 	AppExe     string    `json:"appExe,omitempty"`
 	// The daily check for a new release is on unless this is set by hand.
+	// 切号前压缩提醒，默认开启；字段取反以便旧 state.json 默认为开。见 compact_remind.go。
+	NoCompactReminder bool `json:"noCompactReminder,omitempty"`
+
 	NoUpdateCheck bool      `json:"noUpdateCheck,omitempty"`
 	UpdateChecked time.Time `json:"updateChecked,omitempty"`
 	LatestVersion string    `json:"latestVersion,omitempty"`
@@ -620,6 +623,15 @@ func (s *switcher) setSpendWeekly(on bool) {
 	s.onChange()
 }
 
+// setCompactReminder 开关"切号前提醒压缩"。
+func (s *switcher) setCompactReminder(on bool) {
+	s.mu.Lock()
+	s.st.NoCompactReminder = !on
+	s.saveState()
+	s.mu.Unlock()
+	s.onChange()
+}
+
 func (s *switcher) setThreshold(t float64) {
 	s.mu.Lock()
 	s.st.Threshold = t
@@ -634,10 +646,12 @@ type snapshot struct {
 	Active      string
 	AutoSwitch  bool
 	SpendWeekly bool
-	Threshold   float64
-	Status      string
-	Note        string
-	Busy        bool
+	// CompactReminder 是否在快用满、要切号前提醒压缩大对话。
+	CompactReminder bool
+	Threshold       float64
+	Status          string
+	Note            string
+	Busy            bool
 	// Update is a version newer than this one, empty while there is none.
 	Update string
 	// Errs 是各账户最近一次用量查询失败的原因（键为 UUID）。
@@ -648,7 +662,7 @@ func (s *switcher) snapshot() snapshot {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	snap := snapshot{Active: s.active, AutoSwitch: s.st.AutoSwitch, SpendWeekly: s.st.SpendWeekly, Threshold: s.st.Threshold,
-		Status: s.status, Note: s.autoNote(time.Now()), Busy: s.busy.Load(), Errs: map[string]string{}}
+		Status: s.status, Note: s.autoNote(time.Now()), Busy: s.busy.Load(), Errs: map[string]string{}, CompactReminder: !s.st.NoCompactReminder}
 	for k, v := range s.errs {
 		snap.Errs[k] = v
 	}

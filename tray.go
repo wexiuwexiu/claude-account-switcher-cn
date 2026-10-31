@@ -22,6 +22,7 @@ type tray struct {
 	accounts   [maxAccounts]*systray.MenuItem
 	auto       *systray.MenuItem
 	spend      *systray.MenuItem
+	compact    *systray.MenuItem
 	thresholds []*systray.MenuItem
 	add        *systray.MenuItem
 	importNow  *systray.MenuItem
@@ -53,6 +54,7 @@ func (t *tray) onReady() {
 		t.thresholds = append(t.thresholds, limit.AddSubMenuItemCheckbox(fmt.Sprintf("%.0f%%", v), "", false))
 	}
 	t.spend = systray.AddMenuItemCheckbox("Auto-switch to use up expiring weekly", "Switch to an account whose weekly limit resets within a day with half or more of it unused", false)
+	t.compact = systray.AddMenuItemCheckbox("Remind to /compact before switching", "When the 5-hour limit will run out soon, remind to compact large chats before switching accounts", false)
 	t.add = systray.AddMenuItem("Add account…", "Restart Claude on its sign-in screen, your current account is kept")
 	t.importNow = systray.AddMenuItem("Import chats from all accounts", "Restart Claude so every chat shows up in this account")
 	systray.AddSeparator()
@@ -95,6 +97,8 @@ func (t *tray) onReady() {
 				go board.open()
 			case <-t.auto.ClickedCh:
 				t.s.setAuto(!t.auto.Checked())
+			case <-t.compact.ClickedCh:
+				t.s.setCompactReminder(!t.compact.Checked())
 			case <-t.spend.ClickedCh:
 				t.s.setSpendWeekly(!t.spend.Checked())
 			case <-t.add.ClickedCh:
@@ -133,6 +137,7 @@ func (t *tray) onReady() {
 	t.s.onChange()
 	go t.loop()
 	go t.updateLoop()
+	go t.compactLoop()
 }
 
 // loop runs refresh every few seconds while a new sign-in is expected,
@@ -214,6 +219,7 @@ func (t *tray) render() {
 
 	setChecked(t.auto, snap.AutoSwitch)
 	setChecked(t.spend, snap.SpendWeekly)
+	setChecked(t.compact, snap.CompactReminder)
 	for i, item := range t.thresholds {
 		setChecked(item, thresholds[i] == snap.Threshold)
 	}
