@@ -23,6 +23,9 @@ type Account struct {
 	Plan    string `json:"plan"`
 	Usage   *Usage `json:"usage,omitempty"`
 	Problem string `json:"problem,omitempty"`
+	// Pending 表示只登录了网页、还没有 Claude Code token 的账户（例如尚未开通 Pro）：
+	// 可以切换，但读不到资料和用量；等 token 出现后自动补全并清除此标记。
+	Pending bool `json:"pending,omitempty"`
 }
 
 func (a *Account) label() string {
@@ -194,8 +197,17 @@ func (s *switcher) check(ctx context.Context) (string, func() error) {
 	}
 	_, exe := desktopProcesses()
 
+	// 网页已登录但没有 token 的账户：check 用 token 判断的 active 为空，显示上仍标为当前账户。
+	pending := ""
+	if active == "" {
+		pending = s.app().pendingAccount()
+	}
+
 	s.mu.Lock()
 	s.active = active
+	if pending != "" && s.account(pending) != nil {
+		s.active = pending
+	}
 	if exe != "" {
 		s.st.AppExe = exe
 	}
@@ -218,7 +230,8 @@ func (s *switcher) check(ctx context.Context) (string, func() error) {
 		}
 		due := a.Usage == nil || now.Sub(a.Usage.CheckedAt) >= every-5*time.Second
 		if due && now.After(s.backoff[a.UUID]) {
-			jobs = append(jobs, job{a.UUID, false})
+			// 仅网页登录的账户每次都按"新账户"查一遍：有 token 了就补全资料。
+			jobs = append(jobs, job{a.UUID, a.Pending})
 		}
 	}
 	s.mu.Unlock()
@@ -226,6 +239,14 @@ func (s *switcher) check(ctx context.Context) (string, func() error) {
 	added := false
 	for _, j := range jobs {
 		token, err := s.tokenFor(j.uuid, active)
+		if err != nil && j.new {
+			s.mu.Lock()
+			isPending := s.account(j.uuid) != nil
+			s.mu.Unlock()
+			if isPending {
+				continue // 还没有 token 是预期情况，不记错误
+			}
+		}
 		var p profile
 		var u *Usage
 		if err == nil && j.new {
@@ -258,7 +279,12 @@ func (s *switcher) check(ctx context.Context) (string, func() error) {
 			// 新账户识别失败以前不留痕迹，这里记下原因便于排查。
 			log.Printf("new sign-in %s not added yet: %v", j.uuid[:8], err)
 		}
-		if j.new && err == nil {
+		if j.new && err == nil && a != nil {
+			// 之前仅网页登录的账户现在有 token 了：补全资料。
+			a.Org, a.Name, a.Email, a.Plan = p.Organization.UUID, p.Account.DisplayName, p.Account.Email, p.plan()
+			a.Pending, a.Problem = false, ""
+			log.Printf("account %s now has a Claude Code sign-in", a.label())
+		} else if j.new && err == nil {
 			a = &Account{UUID: j.uuid, Org: p.Organization.UUID, Name: p.Account.DisplayName, Email: p.Account.Email, Plan: p.plan()}
 			s.st.Accounts = append(s.st.Accounts, a)
 			added = true
@@ -286,14 +312,14 @@ func (s *switcher) check(ctx context.Context) (string, func() error) {
 		s.addingAt = time.Time{}
 	} else if adding && time.Since(s.addingAt) > 15*time.Minute {
 		s.addingAt, s.status = time.Time{}, ""
-	} else if adding && active == "" {
-		if id := s.app().pendingAccount(); id != "" && s.account(id) == nil {
-			msg := "New account signed in. Open the Code tab in Claude and send a message to finish"
-			if s.status != msg {
-				log.Printf("new sign-in %s has no Claude Code token yet; waiting for the Code tab", id[:8])
-				s.status = msg
-			}
-		}
+	} else if adding && pending != "" && s.account(pending) == nil {
+		// 新账户只登录了网页（例如还没开通 Pro，用不了 Code 标签页）：先录入，
+		// 切换靠保存的 Cookie；开通并用过 Code 后由上面的 job 自动补全资料和用量。
+		s.st.Accounts = append(s.st.Accounts, &Account{UUID: pending, Name: "Account " + pending[:8], Pending: true,
+			Problem: "web sign-in only; usage shows after Pro + one use of the Code tab"})
+		s.active = pending
+		s.addingAt, s.status = time.Time{}, ""
+		log.Printf("added account %s with a web sign-in only", pending[:8])
 	}
 	s.saveState()
 	target, cause := s.autoTarget(desktopRunning(), lastChat, time.Now())
@@ -402,6 +428,10 @@ func (s *switcher) restart(change func(active string) error) error {
 		return fmt.Errorf("backup: %w", err)
 	}
 	active, err := s.app().activeAccount()
+	if err == nil && active == "" {
+		// 仅网页登录的账户也要在切走前保存，否则它的登录会被覆盖。
+		active = s.app().pendingAccount()
+	}
 	if err == nil {
 		err = change(active)
 	}
@@ -449,6 +479,11 @@ func (s *switcher) switchTo(uuid string, cause switchCause) error {
 		}
 		if err := restoreProfile(s.app(), s.profileDir(uuid)); err != nil {
 			return fmt.Errorf("restore sign-in: %w", err)
+		}
+		if target.Org == "" {
+			// 仅网页登录的账户还不知道组织 ID，对话目录无从确定，跳过导入。
+			log.Printf("switched to %s, chats not imported until it has a Claude Code sign-in", target.label())
+			return nil
 		}
 		n, err := syncSessions(s.app().sessionsDir(), target.UUID, target.Org)
 		log.Printf("switched to %s, %d chats imported", target.label(), n)
@@ -502,6 +537,9 @@ func (s *switcher) importChats() error {
 		s.mu.Unlock()
 		if a == nil {
 			return errors.New("no signed-in account")
+		}
+		if a.Org == "" {
+			return errors.New("this account has a web sign-in only; use the Code tab once first")
 		}
 		n, err := syncSessions(s.app().sessionsDir(), a.UUID, a.Org)
 		log.Printf("%d chats imported into %s", n, a.label())
