@@ -65,3 +65,14 @@ func TestDashboardServer(t *testing.T) {
 		t.Fatalf("unknown: got %d", res.StatusCode)
 	}
 }
+
+// 切换代价只列上下文 ≥ 15 万的对话，保持从大到小的顺序；没有时是空数组而不是 null。
+func TestBigChats(t *testing.T) {
+	got := bigChats([]chatInfo{{Title: "a", Context: 500_000}, {Title: "b", Context: 200_000}, {Title: "c", Context: 90_000}})
+	if len(got) != 2 || got[0].Title != "a" || got[1].Title != "b" {
+		t.Fatalf("got %+v", got)
+	}
+	if got := bigChats(nil); got == nil || len(got) != 0 {
+		t.Fatalf("empty should be [], got %#v", got)
+	}
+}

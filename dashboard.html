@@ -139,6 +139,13 @@
   .sheet button:active { background: var(--fill-press); }
   .sheet.cancel { margin-top: 8px; animation-delay: .03s; }
   .sheet.cancel button { font-weight: 600; }
+  .sheet .cost { margin-top: 10px; padding: 10px 12px; border-radius: 10px; text-align: left;
+                 background: color-mix(in srgb, var(--orange) 12%, transparent); color: var(--label); font-size: 14px; }
+  .sheet .cost b { display: block; color: var(--orange); font-size: 14px; margin-bottom: 4px; }
+  .sheet .cost .ci { display: flex; justify-content: space-between; gap: 12px; color: var(--label2); }
+  .sheet .cost .ci span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sheet .cost .more { color: var(--label3); }
+  .sheet .cost .tip { margin-top: 6px; color: var(--label2); font-size: 13px; }
   @keyframes fade { from { opacity: 0; } }
   @keyframes up { from { transform: translateY(40px); opacity: 0; } }
 </style>
@@ -206,6 +213,9 @@ function countdown(ms) {
   if (h > 0) return `${h} 小时 ${mm} 分`;
   return `${mm} 分钟`;
 }
+// token 数写成"45.2万"
+const tokens = n => n >= 1e4 ? (n / 1e4).toFixed(1) + '万' : String(n);
+
 // 倒计时占位：tick() 每秒按 data-until 刷新文字
 const cd = iso => `<span data-until="${iso}">${countdown(new Date(iso) - now())}</span>`;
 
@@ -406,7 +416,14 @@ function renderSheet() {
   if (!a || state.busy) { el.className = 'sheet-wrap hide'; el.innerHTML = ''; return; }
   const [name] = splitLabel(a.label);
   el.className = 'sheet-wrap';
-  el.innerHTML = `<div class="sheet"><div class="msg"><b>切换到 ${esc(name)}？</b>Claude 会重启，正在生成的回复会中断</div>
+  // 切换代价：最近 1 小时用过的大对话，切过去续聊要在新账号里整段重写
+  const big = state.bigChats || [];
+  const total = big.reduce((n, c) => n + c.context, 0);
+  const cost = big.length ? `<div class="cost"><b>⚠ 最近 1 小时有 ${big.length} 个大对话，合计 ${tokens(total)} token</b>
+    ${big.slice(0, 3).map(c => `<div class="ci"><span>${esc(c.title)}</span><span class="num">${tokens(c.context)}</span></div>`).join('')}
+    ${big.length > 3 ? `<div class="ci more">还有 ${big.length - 3} 个</div>` : ''}
+    <div class="tip">切过去续聊会在新账号里全部重写；不急的话先在当前账号里 /compact，或只续聊其中一个</div></div>` : '';
+  el.innerHTML = `<div class="sheet"><div class="msg"><b>切换到 ${esc(name)}？</b>Claude 会重启，正在生成的回复会中断${cost}</div>
     <button data-act="switch">切换</button></div><div class="sheet cancel"><button data-act="cancel">取消</button></div>`;
 }
 

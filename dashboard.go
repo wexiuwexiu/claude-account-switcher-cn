@@ -119,6 +119,25 @@ type dashState struct {
 	Busy       bool          `json:"busy"`
 	Status     string        `json:"status,omitempty"`
 	Note       string        `json:"note,omitempty"`
+	// BigChats 是最近 1 小时用过、上下文 ≥ 15 万的对话（切号后续聊会整段重写），
+	// 只在切换确认面板里显示切换代价。
+	BigChats []dashChat `json:"bigChats"`
+}
+
+type dashChat struct {
+	Title   string `json:"title"`
+	Context int    `json:"context"`
+}
+
+// bigChats 取最近 recentWithin 内上下文 ≥ bigContext 的对话，从大到小。
+func bigChats(chats []chatInfo) []dashChat {
+	out := []dashChat{}
+	for _, c := range chats {
+		if c.Context >= bigContext {
+			out = append(out, dashChat{Title: c.Title, Context: c.Context})
+		}
+	}
+	return out
 }
 
 // buildDashState 把 snapshot 转成页面用的 JSON；用量先经 current() 处理，
@@ -160,7 +179,9 @@ func (d *dashboard) state(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-store")
 	now := time.Now()
-	json.NewEncoder(w).Encode(buildDashState(d.s.snapshot(), now))
+	st := buildDashState(d.s.snapshot(), now)
+	st.BigChats = bigChats(recentChats(d.s.app().sessionsDir(), claudeProjectsDir(), now, recentWithin))
+	json.NewEncoder(w).Encode(st)
 }
 
 // switchTo 与菜单点击账户相同：目标不是当前账户且不忙时，后台执行切换。
