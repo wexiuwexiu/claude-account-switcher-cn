@@ -62,7 +62,7 @@ const (
 	spiGetWorkArea   = 0x0030
 	swpNoZOrder      = 0x0004
 	dpiPerMonitorV2  = ^uintptr(3) // DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 = -4
-	dashWidth        = 520         // 逻辑像素（96 DPI 下）
+	dashWidth        = 580         // 逻辑像素（96 DPI 下）
 	dashCardHeight   = 128         // 首次显示前的估算；页面加载后按实际内容高度调整
 	dashChromeHeight = 120
 	dashMargin       = 12

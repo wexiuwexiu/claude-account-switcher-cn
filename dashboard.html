@@ -40,9 +40,9 @@
   .banner { background: var(--accent-soft); color: var(--text); padding: 8px 12px; border-radius: 10px; margin-bottom: 8px; font-size: 13px; }
   .banner.err { background: rgba(229,72,77,.1); }
   /* ---- 当前账户：大卡片 ---- */
-  .hero { background: var(--card); border-radius: 14px; padding: 14px 18px 16px; box-shadow: var(--shadow);
+  .hero { background: var(--card); border-radius: 14px; padding: 18px 20px 20px; box-shadow: var(--shadow);
           outline: 1.5px solid var(--accent-line); outline-offset: -1.5px; margin-bottom: 12px; }
-  .hero-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+  .hero-head { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
   .avatar { flex: none; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center;
             font-size: 15px; font-weight: 600; color: #fff; }
   .hname { font-size: 18px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -53,7 +53,7 @@
   .dot.stale { background: var(--warn); } .dot.err { background: var(--full); }
 
   .big { display: grid; grid-template-columns: 30px 1fr auto; align-items: center; column-gap: 12px; }
-  .big + .big { margin-top: 12px; }
+  .big + .big { margin-top: 18px; }
   .big .lbl { color: var(--muted); font-size: 15px; }
   .bar { position: relative; border-radius: 6px; background: var(--track); overflow: hidden; }
   .big .bar { height: 12px; }
@@ -63,7 +63,7 @@
   .big .pct { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; min-width: 72px; text-align: right; line-height: 1.1; }
   .big.small .bar { height: 8px; }
   .big.small .pct { font-size: 19px; }
-  .big .when { grid-column: 2 / 4; margin-top: 4px; font-size: 14px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .big .when { grid-column: 2 / 4; margin-top: 6px; font-size: 14px; color: var(--muted); font-variant-numeric: tabular-nums; }
   .big .when b { color: var(--text); font-weight: 600; }
   .problem { color: var(--muted); font-size: 14px; background: var(--btn); border-radius: 8px; padding: 8px 12px; }
 
@@ -71,20 +71,20 @@
   .others { background: var(--card); border-radius: 14px; box-shadow: var(--shadow); overflow: hidden; }
   /* 第一行：头像 | 名字 | 5h | 周；第二行：状态 | 5h 重置 | 周重置；可选第三行：推荐理由 */
   .acc { display: grid; grid-template-columns: 26px 96px minmax(0, 1fr) minmax(0, 1fr); align-items: center;
-         column-gap: 10px; row-gap: 2px; padding: 10px 16px; font-size: 15px; }
+         column-gap: 10px; row-gap: 6px; padding: 15px 16px; font-size: 15px; }
   .acc .avatar { grid-row: 1 / 3; align-self: center; }
   .acc.rec { background: var(--accent-soft); }
   .acc.rec.clickable:hover { background: var(--accent-soft); filter: brightness(.98); }
   .rtag { font-size: 11px; font-weight: 600; color: #fff; background: var(--accent); border-radius: 999px; padding: 0 7px; margin-left: 6px; vertical-align: 2px; }
-  .sub { font-size: 13px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+  .sub { font-size: 14px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
   .sub b { color: var(--warn); font-weight: 600; }
-  .why { grid-column: 2 / 5; font-size: 13px; color: var(--accent); margin-top: 2px; }
+  .why { grid-column: 2 / 5; font-size: 13px; color: var(--accent); margin-top: 4px; }
   .acc + .acc, .acc + .confirm, .confirm + .acc { border-top: 1px solid var(--line); }
   .acc.clickable { cursor: pointer; }
   .acc.clickable:hover { background: var(--card-hover); }
   .acc .avatar { width: 26px; height: 26px; font-size: 13px; }
   .acc .name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .acc .status { text-align: left; font-size: 13px; }
+  .acc .status { text-align: left; font-size: 14px; }
   .mini { display: grid; grid-template-columns: 18px 1fr 42px; align-items: center; column-gap: 6px; }
   .mini .lbl { color: var(--muted); font-size: 12px; }
   .mini .bar { height: 6px; }
@@ -155,14 +155,15 @@ function color(pct) {
   return 'var(--ok)';
 }
 
-// 时间：今天 "18:50"，明天 "明天 05:00"，一周内 "周日 05:00"，更远 "11-03 05:00"
+// 时间始终带周几："今天 周六 23:40"、"明天 周日 02:10"、"周二 17:59"、"11-07 周六 03:00"
 function absTime(d) {
   const n = new Date(now()), hm = pad(d.getHours()) + ':' + pad(d.getMinutes());
+  const wd = '周' + '日一二三四五六'[d.getDay()];
   const days = Math.round((new Date(d).setHours(0,0,0,0) - new Date(n).setHours(0,0,0,0)) / 864e5);
-  if (days === 0) return hm;
-  if (days === 1) return '明天 ' + hm;
-  if (days < 7) return '周' + '日一二三四五六'[d.getDay()] + ' ' + hm;
-  return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${hm}`;
+  if (days === 0) return `今天 ${wd} ${hm}`;
+  if (days === 1) return `明天 ${wd} ${hm}`;
+  if (days < 7) return `${wd} ${hm}`;
+  return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${wd} ${hm}`;
 }
 
 function countdown(ms) {
