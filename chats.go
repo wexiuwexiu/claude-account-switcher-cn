@@ -123,9 +123,14 @@ func lastRequest(path string) (time.Time, int, bool) {
 	}
 	type line struct {
 		Type        string `json:"type"`
+		Subtype     string `json:"subtype"`
 		Timestamp   string `json:"timestamp"`
 		IsSidechain bool   `json:"isSidechain"`
-		Message     struct {
+		// /compact 写入的 compact_boundary 记录，postTokens 是压缩后的消息部分大小
+		Compact *struct {
+			PostTokens int `json:"postTokens"`
+		} `json:"compactMetadata"`
+		Message struct {
 			Usage *struct {
 				Input         int `json:"input_tokens"`
 				CacheRead     int `json:"cache_read_input_tokens"`
@@ -144,19 +149,28 @@ func lastRequest(path string) (time.Time, int, bool) {
 			skipFirst = false
 			continue
 		}
-		if !bytes.Contains(b, []byte(`"usage"`)) {
+		isCompact := bytes.Contains(b, []byte(`"compact_boundary"`))
+		if !isCompact && !bytes.Contains(b, []byte(`"usage"`)) {
 			continue
 		}
 		var l line
-		if json.Unmarshal(b, &l) != nil || l.Type != "assistant" || l.IsSidechain || l.Message.Usage == nil {
+		if json.Unmarshal(b, &l) != nil || l.IsSidechain {
 			continue
 		}
 		t, err := time.Parse(time.RFC3339Nano, l.Timestamp)
 		if err != nil || t.Before(best) {
 			continue
 		}
-		u := l.Message.Usage
-		best, bestCtx = t, u.Input+u.CacheRead+u.CacheCreation
+		switch {
+		case l.Type == "assistant" && l.Message.Usage != nil:
+			u := l.Message.Usage
+			best, bestCtx = t, u.Input+u.CacheRead+u.CacheCreation
+		case l.Type == "system" && l.Subtype == "compact_boundary" && l.Compact != nil:
+			// 刚压缩完、还没发新消息时，没有新的 usage；用压缩后大小，
+			// 否则切换确认面板会一直按压缩前的几十万显示代价。
+			// 注意：postTokens 不含系统提示和工具（约 3～5 万），只用于判断是否还算大对话。
+			best, bestCtx = t, l.Compact.PostTokens
+		}
 	}
 	return best, bestCtx, !best.IsZero()
 }

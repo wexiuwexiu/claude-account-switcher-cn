@@ -504,7 +504,8 @@ document.addEventListener('click', e => {
   if (act === 'switch' && confirming) return doSwitch(confirming);
   if (act === 'cancel' || e.target.id === 'sheet') { confirming = null; return renderSheet(); }
   const row = e.target.closest('.row:not(.disabled)');
-  if (row) { confirming = row.dataset.uuid; renderSheet(); }
+  // 先立即弹出确认面板，再拉一次最新状态，让切换代价（大对话上下文）是点击这一刻的
+  if (row) { confirming = row.dataset.uuid; renderSheet(); load(); }
 });
 
 document.addEventListener('keydown', e => {
@@ -517,6 +518,8 @@ renderTools();
 // 字体加载完或窗口尺寸变化后重新量一次高度，避免首次测量偏差
 document.fonts && document.fonts.ready.then(fit);
 window.addEventListener('resize', fit);
+// 窗口从隐藏变为显示时立即刷新，不等 15 秒的定时轮询
+document.addEventListener('visibilitychange', () => { if (!document.hidden) load(); });
 load();
 setInterval(load, 15000);
 setInterval(tick, 1000);

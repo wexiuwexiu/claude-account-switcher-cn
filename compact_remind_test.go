@@ -67,6 +67,14 @@ func TestRecentChats(t *testing.T) {
 	if len(chats) != 1 || chats[0].Context != 300_005 || chats[0].Title != "大任务" {
 		t.Fatalf("chats = %+v", chats)
 	}
+	// 刚 /compact 完、还没新请求：按 compact_boundary 的 postTokens 算
+	f, _ := os.OpenFile(filepath.Join(projects, "proj", "cli1.jsonl"), os.O_APPEND|os.O_WRONLY, 0)
+	fmt.Fprintf(f, `{"type":"system","subtype":"compact_boundary","timestamp":%q,"isSidechain":false,"compactMetadata":{"trigger":"manual","preTokens":300000,"postTokens":15000}}`+"\n",
+		now.Add(-time.Minute).UTC().Format(time.RFC3339Nano))
+	f.Close()
+	if chats := recentChats(sessions, projects, now, time.Hour); len(chats) != 1 || chats[0].Context != 15_000 {
+		t.Fatalf("after compact = %+v", chats)
+	}
 	if got := recentChats(sessions, projects, now.Add(2*time.Hour), time.Hour); len(got) != 0 {
 		t.Fatalf("old chats should be skipped: %+v", got)
 	}
