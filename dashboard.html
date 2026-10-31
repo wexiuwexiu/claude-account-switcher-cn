@@ -6,57 +6,80 @@
 <title>Claude Account Switcher</title>
 <style>
   :root {
-    --bg: #f5f5f7; --card: #fff; --text: #1d1d1f; --muted: #6e6e73; --line: #e5e5ea;
-    --track: rgba(142,142,147,.22); --ok: #34c759; --warn: #ff9f0a; --full: #ff3b30; --accent: #0a84ff;
+    --bg: #f2f2f6; --card: #ffffff; --text: #1d1d1f; --muted: #86868b; --line: rgba(0,0,0,.07);
+    --track: rgba(120,120,128,.16); --ok: #30b158; --warn: #f59e0b; --full: #ef4444; --accent: #2f6fed;
+    --accent-soft: rgba(47,111,237,.10); --shadow: 0 1px 2px rgba(0,0,0,.05), 0 1px 1px rgba(0,0,0,.03);
   }
   @media (prefers-color-scheme: dark) {
-    :root { --bg: #1c1c1e; --card: #2c2c2e; --text: #f5f5f7; --muted: #98989d; --line: #3a3a3c; --track: rgba(142,142,147,.3); }
+    :root { --bg: #161618; --card: #232326; --text: #f2f2f4; --muted: #8e8e93; --line: rgba(255,255,255,.08);
+            --track: rgba(120,120,128,.28); --accent: #5b8cff; --accent-soft: rgba(91,140,255,.16); --shadow: none; }
   }
   * { box-sizing: border-box; }
-  body { margin: 0; padding: 24px; background: var(--bg); color: var(--text);
-         font: 14px/1.45 "Segoe UI", "Microsoft YaHei", system-ui, sans-serif; }
-  header { display: flex; align-items: baseline; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
-  h1 { font-size: 18px; margin: 0; font-weight: 600; }
-  .meta { color: var(--muted); font-size: 12px; }
-  .banner { background: var(--card); border-left: 3px solid var(--accent); padding: 8px 12px; border-radius: 6px; margin-bottom: 12px; }
-  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 14px; }
-  .card { background: var(--card); border-radius: 12px; padding: 16px 18px; border: 2px solid transparent;
-          box-shadow: 0 1px 3px rgba(0,0,0,.08); }
-  .card.active { border-color: var(--accent); }
+  html, body { margin: 0; }
+  body { padding: 14px 14px 10px; background: var(--bg); color: var(--text); -webkit-font-smoothing: antialiased;
+         font: 13px/1.4 "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", "Microsoft YaHei", system-ui, sans-serif; }
+  header { display: flex; align-items: center; gap: 8px; margin: 0 2px 10px; }
+  h1 { font-size: 14px; margin: 0; font-weight: 600; letter-spacing: .2px; }
+  .chips { margin-left: auto; display: flex; gap: 6px; }
+  .chip { font-size: 11px; color: var(--muted); background: var(--card); border-radius: 999px; padding: 2px 8px; box-shadow: var(--shadow); }
+  .chip.on { color: var(--accent); background: var(--accent-soft); box-shadow: none; }
+  .banner { background: var(--accent-soft); color: var(--text); padding: 6px 10px; border-radius: 8px; margin-bottom: 8px; font-size: 12px; }
+  .list { display: flex; flex-direction: column; gap: 8px; }
+
+  .card { position: relative; background: var(--card); border-radius: 10px; padding: 10px 12px 9px; box-shadow: var(--shadow);
+          border: 1px solid transparent; transition: border-color .15s, transform .15s; }
+  .card.active { border-color: var(--accent); background: linear-gradient(var(--accent-soft), var(--accent-soft)), var(--card); }
   .card.clickable { cursor: pointer; }
-  .card.clickable:hover { border-color: var(--line); }
-  .head { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
-  .name { font-weight: 600; font-size: 15px; }
-  .email { color: var(--muted); font-size: 12px; margin-left: auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .tag { font-size: 11px; padding: 1px 7px; border-radius: 9px; background: var(--accent); color: #fff; }
-  .row { display: grid; grid-template-columns: 34px 1fr 46px; align-items: center; gap: 10px; margin: 8px 0 2px; }
-  .lbl { color: var(--muted); font-size: 12px; }
-  .bar { position: relative; height: 12px; border-radius: 6px; background: var(--track); overflow: hidden; }
-  .fill { height: 100%; border-radius: 6px; transition: width .4s; }
-  /* 时间刻度：窗口已过去的比例，用于对比用量节奏 */
-  .pace { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--text); opacity: .45; }
-  .pct { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
-  .reset { margin-left: 44px; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
-  .reset b { color: var(--text); font-weight: 500; }
-  .problem { color: var(--full); }
-  .foot { margin-top: 18px; color: var(--muted); font-size: 12px; }
-  .fresh { margin-top: 10px; color: var(--muted); font-size: 11px; }
-  .fresh.stale { color: var(--warn); }
-  .fresh.err { color: var(--full); }
+  .card.clickable:hover { border-color: var(--line); transform: translateY(-1px); }
+  .card.clickable:hover .go { opacity: 1; }
+
+  .head { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; min-width: 0; }
+  .avatar { flex: none; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center;
+            font-size: 11px; font-weight: 600; color: #fff; }
+  .who { min-width: 0; display: flex; align-items: baseline; gap: 6px; }
+  .name { font-weight: 600; white-space: nowrap; }
+  .email { color: var(--muted); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tag { flex: none; font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 999px; background: var(--accent); color: #fff; }
+  .plan { flex: none; font-size: 10px; color: var(--muted); border: 1px solid var(--line); padding: 0 5px; border-radius: 4px; }
+  .side { margin-left: auto; flex: none; display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); }
+  .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--ok); }
+  .dot.stale { background: var(--warn); } .dot.err { background: var(--full); }
+  .go { opacity: 0; color: var(--accent); font-weight: 600; transition: opacity .15s; }
+
+  .row { display: grid; grid-template-columns: 18px 1fr 34px 112px; align-items: center; gap: 8px; height: 20px; }
+  .lbl { color: var(--muted); font-size: 11px; }
+  .bar { position: relative; height: 6px; border-radius: 3px; background: var(--track); overflow: hidden; }
+  .fill { height: 100%; border-radius: 3px; transition: width .4s; }
+  /* 竖线：当前窗口已过去的时间比例，用量条超过它说明用得比时间快 */
+  .pace { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--text); opacity: .35; }
+  .pct { text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .when { text-align: right; color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .when b { color: var(--text); font-weight: 500; }
+  .note { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .note.err { color: var(--full); } .note.stale { color: var(--warn); }
+  .problem { color: var(--full); font-size: 12px; }
+  .empty { text-align: center; color: var(--muted); padding: 24px 0; }
+  .foot { margin: 10px 2px 0; color: var(--muted); font-size: 11px; }
 </style>
 </head>
 <body>
 <header>
-  <h1>Claude 账户用量</h1>
-  <span class="meta" id="meta"></span>
+  <h1>账户用量</h1>
+  <div class="chips" id="chips"></div>
 </header>
 <div id="banner"></div>
-<div class="grid" id="grid"></div>
-<div class="foot">点击非当前账户的卡片即可切换（会重启 Claude 桌面 app）。竖线表示当前窗口已过去的时间比例。数据每 15 秒刷新。</div>
+<div class="list" id="grid"></div>
+<div class="foot" id="foot">点击其他账户切换 · 竖线 = 窗口已过去的时间 · Esc 关闭</div>
 
 <script>
 // 页面数据来自同目录 api/state；倒计时每秒在本地更新，不额外请求。
 const SESSION_MS = 5 * 3600e3, WEEK_MS = 7 * 24 * 3600e3;
+const AVATAR = ['#5b8cff', '#a78bfa', '#f472b6', '#fb923c', '#34d399', '#22d3ee', '#facc15', '#94a3b8'];
+// 后端的英文提示（托盘菜单也用）在页面上换成中文
+const PROBLEM_ZH = {
+  'web sign-in only; usage shows after Pro + one use of the Code tab': '仅网页登录：开通 Pro 并用一次 Code 标签页后显示用量',
+  'signed out, add it again': '登录已失效，请重新添加',
+};
 let state = null, offset = 0; // offset: 服务器时间 - 本地时间，避免本机时钟偏差
 
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -69,67 +92,79 @@ function color(pct) {
   return 'var(--ok)';
 }
 
-// 绝对时间：今天只写 HH:MM，其它写 周X MM-DD HH:MM
+// 紧凑时间：今天 "18:50"，一周内 "周日 05:00"，更远 "11-03 05:00"
 function absTime(d) {
   const n = new Date(now()), hm = pad(d.getHours()) + ':' + pad(d.getMinutes());
   if (d.toDateString() === n.toDateString()) return hm;
-  const wd = '日一二三四五六'[d.getDay()];
-  return `周${wd} ${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${hm}`;
+  if (d - n < 6 * 864e5) return '周' + '日一二三四五六'[d.getDay()] + ' ' + hm;
+  return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${hm}`;
 }
 
+// 紧凑倒计时："3天5h"、"2h10m"、"9m"
 function countdown(ms) {
-  if (ms <= 0) return '即将重置';
-  const m = Math.floor(ms / 60e3), d = Math.floor(m / 1440), h = Math.floor(m % 1440 / 60), mm = m % 60;
-  if (d > 0) return `${d}天${h}小时`;
-  if (h > 0) return `${h}小时${pad(mm)}分`;
-  return `${mm}分${pad(Math.floor(ms / 1000) % 60)}秒`;
+  if (ms <= 0) return '即将';
+  const m = Math.ceil(ms / 60e3), d = Math.floor(m / 1440), h = Math.floor(m % 1440 / 60), mm = m % 60;
+  if (d > 0) return `${d}天${h}h`;
+  if (h > 0) return `${h}h${pad(mm)}m`;
+  return `${mm}m`;
 }
 
 function windowRow(label, w, spanMs) {
   if (!w) return '';
   const pct = Math.max(0, Math.min(100, w.pct));
-  let pace = '', reset = '<div class="reset">无重置时间（窗口未开始）</div>';
+  let pace = '', when = '<span class="when">未开始</span>';
   if (w.reset) {
     const at = new Date(w.reset), left = at - now();
     const elapsed = Math.max(0, Math.min(1, 1 - left / spanMs));
     pace = `<div class="pace" style="left:calc(${(elapsed * 100).toFixed(1)}% - 1px)"></div>`;
-    const verb = pct >= state.threshold ? '可再用于' : '重置于';
-    reset = `<div class="reset">${verb} <b>${absTime(at)}</b> · 还剩 ${countdown(left)}</div>`;
+    const full = pct >= state.threshold;
+    when = `<span class="when" title="${full ? '满额，可再用于' : '重置于'} ${absTime(at)}"><b>${absTime(at)}</b> · ${countdown(left)}</span>`;
   }
   return `<div class="row"><span class="lbl">${label}</span>
     <div class="bar"><div class="fill" style="width:${pct}%;background:${color(pct)}"></div>${pace}</div>
-    <span class="pct">${Math.round(w.pct)}%</span></div>${reset}`;
+    <span class="pct">${Math.round(w.pct)}%</span>${when}</div>`;
 }
 
-// 数据新旧：显示"N 分钟前更新"，超过 staleAfter 标黄；查询失败时标红并写原因。
-function freshLine(a) {
-  if (!a.checkedAt && !a.error) return '';
+// 数据新旧：右上角小圆点（绿/黄/红）+ 文字；过期或失败时在卡片底部写原因。
+function freshness(a) {
   const ago = a.checkedAt ? Math.max(0, Math.floor((now() - new Date(a.checkedAt)) / 60e3)) : null;
-  const agoText = ago === null ? '从未成功' : ago < 1 ? '刚刚更新' : `${ago} 分钟前更新`;
   const stale = ago === null || ago * 60 > a.staleAfter;
-  const cls = a.error ? 'fresh err' : stale ? 'fresh stale' : 'fresh';
-  const tail = a.error ? ` · 查询失败：${esc(a.error)}` : stale ? ' · 数据可能已过期' : '';
-  return `<div class="${cls}">${agoText}${tail}</div>`;
+  const cls = a.error ? 'err' : stale ? 'stale' : '';
+  const text = ago === null ? '未更新' : ago < 1 ? '刚刚' : ago < 60 ? `${ago}分钟前` : `${Math.floor(ago / 60)}小时前`;
+  const note = a.error ? `<div class="note err">查询失败：${esc(a.error)}</div>`
+             : stale && a.checkedAt ? '<div class="note stale">数据可能已过期</div>' : '';
+  return {side: `<span class="dot ${cls}"></span>${text}`, note};
+}
+
+// 名字和套餐分开显示："wexiu (Pro)" -> 名字 wexiu + 标签 Pro
+function splitLabel(label) {
+  const m = /^(.*) \((\w+)\)$/.exec(label);
+  return m ? [m[1], m[2]] : [label, ''];
 }
 
 function render() {
   if (!state) return;
   const banner = [state.status, state.note].filter(Boolean).map(t => `<div class="banner">${esc(t)}</div>`).join('');
   document.getElementById('banner').innerHTML = banner + (state.busy ? '<div class="banner">正在切换…</div>' : '');
-  document.getElementById('meta').textContent =
-    `阈值 ${state.threshold}% · 自动切换${state.autoSwitch ? '开' : '关'} · 更新于 ${new Date(state.now).toLocaleTimeString()}`;
+  document.getElementById('chips').innerHTML =
+    `<span class="chip">阈值 ${state.threshold}%</span><span class="chip${state.autoSwitch ? ' on' : ''}">自动切换${state.autoSwitch ? '开' : '关'}</span>`;
   const grid = document.getElementById('grid');
-  if (!state.accounts.length) { grid.innerHTML = '<div class="card">还没有账户，请先在 Claude 中登录。</div>'; return; }
-  grid.innerHTML = state.accounts.map(a => {
+  if (!state.accounts.length) { grid.innerHTML = '<div class="card empty">还没有账户，请先在 Claude 中登录</div>'; return; }
+  grid.innerHTML = state.accounts.map((a, i) => {
     const can = !a.active && !state.busy;
+    const [name, plan] = splitLabel(a.label);
+    const f = freshness(a);
     let body;
-    if (a.problem) body = `<div class="problem">${esc(a.problem)}</div>`;
-    else if (!a.session) body = '<div class="reset" style="margin:0">用量未知</div>';
-    else body = windowRow('5h', a.session, SESSION_MS) + windowRow('周', a.weekly, WEEK_MS);
-    body += freshLine(a);
+    if (a.problem) body = `<div class="problem">${esc(PROBLEM_ZH[a.problem] || a.problem)}</div>`;
+    else if (!a.session) body = '<div class="note">用量未知</div>';
+    else body = windowRow('5h', a.session, SESSION_MS) + windowRow('周', a.weekly, WEEK_MS) + f.note;
     return `<div class="card${a.active ? ' active' : ''}${can ? ' clickable' : ''}" data-uuid="${esc(a.uuid)}" data-name="${esc(a.label)}">
-      <div class="head"><span class="name">${esc(a.label)}</span>${a.active ? '<span class="tag">当前</span>' : ''}
-      <span class="email">${esc(a.email || '')}</span></div>${body}</div>`;
+      <div class="head">
+        <span class="avatar" style="background:${AVATAR[i % AVATAR.length]}">${esc((name || '?').slice(0, 1).toUpperCase())}</span>
+        <span class="who"><span class="name">${esc(name)}</span><span class="email">${esc(a.email || '')}</span></span>
+        ${plan ? `<span class="plan">${esc(plan)}</span>` : ''}${a.active ? '<span class="tag">当前</span>' : ''}
+        <span class="side">${can ? '<span class="go">切换 →</span>' : ''}${a.problem ? '' : f.side}</span>
+      </div>${body}</div>`;
   }).join('');
 }
 
@@ -141,7 +176,7 @@ async function load() {
     offset = new Date(state.now) - Date.now();
     render();
   } catch (e) {
-    document.getElementById('meta').textContent = '连接失败，switcher 可能已退出';
+    document.getElementById('banner').innerHTML = '<div class="banner">连接失败，switcher 可能已退出</div>';
   }
 }
 
@@ -158,6 +193,7 @@ document.getElementById('grid').addEventListener('click', async e => {
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && typeof window.hideDashboard === 'function') window.hideDashboard();
 });
+if (typeof window.hideDashboard !== 'function') document.getElementById('foot').textContent = '点击其他账户切换 · 竖线 = 窗口已过去的时间';
 
 load();
 setInterval(load, 15000);
