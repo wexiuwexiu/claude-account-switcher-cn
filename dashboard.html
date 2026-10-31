@@ -6,81 +6,120 @@
 <title>Claude Account Switcher</title>
 <style>
   :root {
-    --bg: #f2f2f6; --card: #ffffff; --text: #1d1d1f; --muted: #86868b; --line: rgba(0,0,0,.07);
-    --track: rgba(120,120,128,.16); --ok: #30b158; --warn: #f59e0b; --full: #ef4444; --accent: #2f6fed;
-    --accent-soft: rgba(47,111,237,.10); --shadow: 0 1px 2px rgba(0,0,0,.05), 0 1px 1px rgba(0,0,0,.03);
+    --bg: #f3f3f5; --card: #ffffff; --card-hover: #fafafb; --text: #1b1b1f; --muted: #7c7c84; --faint: #a1a1aa;
+    --line: rgba(0,0,0,.06); --track: rgba(120,120,135,.15); --ok: #22a75a; --warn: #e8930c; --full: #e5484d;
+    --accent: #3b6ef5; --accent-soft: rgba(59,110,245,.08); --accent-line: rgba(59,110,245,.45);
+    --shadow: 0 1px 2px rgba(16,24,40,.04), 0 1px 3px rgba(16,24,40,.06); --btn: rgba(0,0,0,.05); --btn-hover: rgba(0,0,0,.09);
   }
   @media (prefers-color-scheme: dark) {
-    :root { --bg: #161618; --card: #232326; --text: #f2f2f4; --muted: #8e8e93; --line: rgba(255,255,255,.08);
-            --track: rgba(120,120,128,.28); --accent: #5b8cff; --accent-soft: rgba(91,140,255,.16); --shadow: none; }
+    :root { --bg: #1b1b1e; --card: #26262a; --card-hover: #2c2c31; --text: #ededf0; --muted: #9a9aa3; --faint: #6f6f78;
+            --line: rgba(255,255,255,.07); --track: rgba(140,140,155,.22); --accent: #6d93ff; --accent-soft: rgba(109,147,255,.12);
+            --accent-line: rgba(109,147,255,.55); --shadow: none; --btn: rgba(255,255,255,.07); --btn-hover: rgba(255,255,255,.12); }
   }
   * { box-sizing: border-box; }
-  html, body { margin: 0; }
-  body { padding: 14px 14px 10px; background: var(--bg); color: var(--text); -webkit-font-smoothing: antialiased;
-         font: 13px/1.4 "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", "Microsoft YaHei", system-ui, sans-serif; }
-  header { display: flex; align-items: center; gap: 8px; margin: 0 2px 10px; }
-  h1 { font-size: 14px; margin: 0; font-weight: 600; letter-spacing: .2px; }
-  .chips { margin-left: auto; display: flex; gap: 6px; }
-  .chip { font-size: 11px; color: var(--muted); background: var(--card); border-radius: 999px; padding: 2px 8px; box-shadow: var(--shadow); }
-  .chip.on { color: var(--accent); background: var(--accent-soft); box-shadow: none; }
-  .banner { background: var(--accent-soft); color: var(--text); padding: 6px 10px; border-radius: 8px; margin-bottom: 8px; font-size: 12px; }
-  .list { display: flex; flex-direction: column; gap: 8px; }
+  html, body { margin: 0; overflow-x: hidden; }
+  body { background: var(--bg); color: var(--text); -webkit-font-smoothing: antialiased; user-select: none;
+         font: 14px/1.45 "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", "Microsoft YaHei", system-ui, sans-serif; }
+  #app { padding: 0 16px 14px; }
 
-  .card { position: relative; background: var(--card); border-radius: 10px; padding: 10px 12px 9px; box-shadow: var(--shadow);
-          border: 1px solid transparent; transition: border-color .15s, transform .15s; }
-  .card.active { border-color: var(--accent); background: linear-gradient(var(--accent-soft), var(--accent-soft)), var(--card); }
+  /* 页面自带标题栏（原生窗口没有系统标题栏） */
+  .titlebar { display: flex; align-items: center; gap: 10px; height: 52px; }
+  .logo { width: 22px; height: 22px; border-radius: 50%; border: 3px solid var(--track); border-top-color: var(--ok); border-right-color: var(--ok); }
+  h1 { font-size: 15px; margin: 0; font-weight: 600; }
+  .chips { display: flex; gap: 6px; margin-left: 4px; }
+  .chip { font-size: 12px; color: var(--muted); background: var(--btn); border-radius: 999px; padding: 2px 9px; }
+  .chip.on { color: var(--accent); background: var(--accent-soft); }
+  .tools { margin-left: auto; display: flex; gap: 2px; }
+  .ibtn { width: 30px; height: 30px; border: 0; border-radius: 8px; background: transparent; color: var(--muted);
+          display: grid; place-items: center; cursor: pointer; }
+  .ibtn:hover { background: var(--btn-hover); color: var(--text); }
+  .ibtn.on { color: var(--accent); background: var(--accent-soft); }
+  .ibtn svg { width: 16px; height: 16px; }
+
+  .banner { background: var(--accent-soft); color: var(--text); padding: 8px 12px; border-radius: 10px; margin-bottom: 10px; font-size: 13px; }
+  .banner.err { background: rgba(229,72,77,.1); }
+  .list { display: flex; flex-direction: column; gap: 10px; }
+
+  .card { background: var(--card); border-radius: 12px; padding: 14px 16px 12px; box-shadow: var(--shadow);
+          outline: 1.5px solid transparent; outline-offset: -1.5px; transition: outline-color .15s, background .15s; }
+  .card.active { outline-color: var(--accent-line); background: linear-gradient(var(--accent-soft), var(--accent-soft)), var(--card); }
   .card.clickable { cursor: pointer; }
-  .card.clickable:hover { border-color: var(--line); transform: translateY(-1px); }
-  .card.clickable:hover .go { opacity: 1; }
+  .card.clickable:hover { background: var(--card-hover); outline-color: var(--line); }
+  .card.clickable:hover .go { opacity: 1; transform: none; }
 
-  .head { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; min-width: 0; }
-  .avatar { flex: none; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center;
-            font-size: 11px; font-weight: 600; color: #fff; }
-  .who { min-width: 0; display: flex; align-items: baseline; gap: 6px; }
-  .name { font-weight: 600; white-space: nowrap; }
-  .email { color: var(--muted); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .tag { flex: none; font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 999px; background: var(--accent); color: #fff; }
-  .plan { flex: none; font-size: 10px; color: var(--muted); border: 1px solid var(--line); padding: 0 5px; border-radius: 4px; }
-  .side { margin-left: auto; flex: none; display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); }
-  .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--ok); }
+  .head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; min-width: 0; }
+  .avatar { flex: none; width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center;
+            font-size: 14px; font-weight: 600; color: #fff; }
+  .who { min-width: 0; flex: 1; }
+  .line1 { display: flex; align-items: center; gap: 6px; min-width: 0; }
+  .name { font-weight: 600; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .email { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tag { flex: none; font-size: 11px; font-weight: 600; padding: 1px 8px; border-radius: 999px; background: var(--accent); color: #fff; }
+  .plan { flex: none; font-size: 11px; color: var(--muted); background: var(--btn); padding: 0 6px; border-radius: 5px; }
+  .side { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; font-size: 12px; color: var(--muted); }
+  .fresh { display: flex; align-items: center; gap: 5px; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
   .dot.stale { background: var(--warn); } .dot.err { background: var(--full); }
-  .go { opacity: 0; color: var(--accent); font-weight: 600; transition: opacity .15s; }
+  .go { opacity: 0; transform: translateX(-3px); color: var(--accent); font-weight: 600; transition: opacity .15s, transform .15s; }
 
-  .row { display: grid; grid-template-columns: 18px 1fr 34px 112px; align-items: center; gap: 8px; height: 20px; }
-  .lbl { color: var(--muted); font-size: 11px; }
-  .bar { position: relative; height: 6px; border-radius: 3px; background: var(--track); overflow: hidden; }
-  .fill { height: 100%; border-radius: 3px; transition: width .4s; }
+  .row { display: grid; grid-template-columns: 22px 1fr 44px; align-items: center; column-gap: 10px; }
+  .row + .row { margin-top: 8px; }
+  .lbl { color: var(--muted); font-size: 12px; }
+  .bar { position: relative; height: 8px; border-radius: 4px; background: var(--track); overflow: hidden; }
+  .fill { height: 100%; border-radius: 4px; transition: width .4s; }
   /* 竖线：当前窗口已过去的时间比例，用量条超过它说明用得比时间快 */
-  .pace { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--text); opacity: .35; }
-  .pct { text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
-  .when { text-align: right; color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pace { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--text); opacity: .3; }
+  .pct { text-align: right; font-weight: 600; font-size: 14px; font-variant-numeric: tabular-nums; }
+  .when { grid-column: 2 / 4; display: flex; justify-content: space-between; margin-top: 3px;
+          color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
   .when b { color: var(--text); font-weight: 500; }
-  .note { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .note { font-size: 12px; color: var(--muted); margin-top: 8px; }
   .note.err { color: var(--full); } .note.stale { color: var(--warn); }
-  .problem { color: var(--full); font-size: 12px; }
-  .empty { text-align: center; color: var(--muted); padding: 24px 0; }
-  .foot { margin: 10px 2px 0; color: var(--muted); font-size: 11px; }
+  .problem { color: var(--muted); font-size: 13px; background: var(--btn); border-radius: 8px; padding: 8px 10px; }
+
+  /* 卡片内的切换确认（替代系统 confirm 弹窗，弹窗会让面板失焦隐藏） */
+  .confirm { display: flex; align-items: center; gap: 8px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); font-size: 13px; }
+  .confirm span { flex: 1; color: var(--muted); }
+  .btn { border: 0; border-radius: 8px; padding: 6px 14px; font: inherit; font-size: 13px; cursor: pointer; background: var(--btn); color: var(--text); }
+  .btn:hover { background: var(--btn-hover); }
+  .btn.primary { background: var(--accent); color: #fff; font-weight: 600; }
+  .btn.primary:hover { filter: brightness(1.08); }
+
+  .empty { text-align: center; color: var(--muted); padding: 28px 0; }
+  .foot { margin-top: 12px; color: var(--faint); font-size: 12px; display: flex; justify-content: space-between; }
 </style>
 </head>
 <body>
-<header>
-  <h1>账户用量</h1>
-  <div class="chips" id="chips"></div>
-</header>
-<div id="banner"></div>
-<div class="list" id="grid"></div>
-<div class="foot" id="foot">点击其他账户切换 · 竖线 = 窗口已过去的时间 · Esc 关闭</div>
+<div id="app">
+  <div class="titlebar">
+    <div class="logo"></div>
+    <h1>账户用量</h1>
+    <div class="chips" id="chips"></div>
+    <div class="tools" id="tools"></div>
+  </div>
+  <div id="banner"></div>
+  <div class="list" id="grid"></div>
+  <div class="foot"><span>点击账户切换 · 竖线 = 窗口已过去的时间</span><span id="updated"></span></div>
+</div>
 
 <script>
 // 页面数据来自同目录 api/state；倒计时每秒在本地更新，不额外请求。
+// 在原生窗口里，WebView2 注入 hideDashboard / pinDashboard / fitDashboard；浏览器里没有这些函数。
 const SESSION_MS = 5 * 3600e3, WEEK_MS = 7 * 24 * 3600e3;
-const AVATAR = ['#5b8cff', '#a78bfa', '#f472b6', '#fb923c', '#34d399', '#22d3ee', '#facc15', '#94a3b8'];
+const AVATAR = ['#5b7cfa', '#9b7bf0', '#e66aa8', '#f08a45', '#2fb98a', '#1fb5cf', '#d4a20b', '#8691a3'];
+const NATIVE = typeof window.hideDashboard === 'function';
 // 后端的英文提示（托盘菜单也用）在页面上换成中文
 const PROBLEM_ZH = {
-  'web sign-in only; usage shows after Pro + one use of the Code tab': '仅网页登录：开通 Pro 并用一次 Code 标签页后显示用量',
+  'web sign-in only; usage shows after Pro + one use of the Code tab': '仅网页登录：开通 Pro 并在 Code 标签页用一次后显示用量',
   'signed out, add it again': '登录已失效，请重新添加',
 };
-let state = null, offset = 0; // offset: 服务器时间 - 本地时间，避免本机时钟偏差
+const ICON = {
+  pin: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9.5 2.5l4 4-2 1-2.5 2.5.5 3-1 1-3-3-3 3M5 8.5l2.5-2.5 1-2z" stroke-linejoin="round"/></svg>',
+  close: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4l8 8M12 4l-8 8" stroke-linecap="round"/></svg>',
+  refresh: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13 8a5 5 0 1 1-1.5-3.6M13 2.5v2.5h-2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+};
+let state = null, offset = 0;   // offset: 服务器时间 - 本地时间，避免本机时钟偏差
+let confirming = null, pinned = false, error = '';
 
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const pad = n => String(n).padStart(2, '0');
@@ -92,64 +131,76 @@ function color(pct) {
   return 'var(--ok)';
 }
 
-// 紧凑时间：今天 "18:50"，一周内 "周日 05:00"，更远 "11-03 05:00"
+// 时间：今天 "18:50"，明天 "明天 05:00"，一周内 "周日 05:00"，更远 "11-03 05:00"
 function absTime(d) {
   const n = new Date(now()), hm = pad(d.getHours()) + ':' + pad(d.getMinutes());
-  if (d.toDateString() === n.toDateString()) return hm;
-  if (d - n < 6 * 864e5) return '周' + '日一二三四五六'[d.getDay()] + ' ' + hm;
+  const days = Math.round((new Date(d).setHours(0,0,0,0) - new Date(n).setHours(0,0,0,0)) / 864e5);
+  if (days === 0) return hm;
+  if (days === 1) return '明天 ' + hm;
+  if (days < 7) return '周' + '日一二三四五六'[d.getDay()] + ' ' + hm;
   return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${hm}`;
 }
 
-// 紧凑倒计时："3天5h"、"2h10m"、"9m"
 function countdown(ms) {
-  if (ms <= 0) return '即将';
+  if (ms <= 0) return '即将重置';
   const m = Math.ceil(ms / 60e3), d = Math.floor(m / 1440), h = Math.floor(m % 1440 / 60), mm = m % 60;
-  if (d > 0) return `${d}天${h}h`;
-  if (h > 0) return `${h}h${pad(mm)}m`;
-  return `${mm}m`;
+  if (d > 0) return `${d} 天 ${h} 小时`;
+  if (h > 0) return `${h} 小时 ${mm} 分`;
+  return `${mm} 分钟`;
 }
 
 function windowRow(label, w, spanMs) {
   if (!w) return '';
   const pct = Math.max(0, Math.min(100, w.pct));
-  let pace = '', when = '<span class="when">未开始</span>';
+  let pace = '', when = '<div class="when"><span>窗口未开始</span></div>';
   if (w.reset) {
     const at = new Date(w.reset), left = at - now();
     const elapsed = Math.max(0, Math.min(1, 1 - left / spanMs));
     pace = `<div class="pace" style="left:calc(${(elapsed * 100).toFixed(1)}% - 1px)"></div>`;
-    const full = pct >= state.threshold;
-    when = `<span class="when" title="${full ? '满额，可再用于' : '重置于'} ${absTime(at)}"><b>${absTime(at)}</b> · ${countdown(left)}</span>`;
+    const verb = pct >= state.threshold ? '可再用于' : '重置于';
+    when = `<div class="when"><span>${verb} <b>${absTime(at)}</b></span><span>还剩 ${countdown(left)}</span></div>`;
   }
   return `<div class="row"><span class="lbl">${label}</span>
     <div class="bar"><div class="fill" style="width:${pct}%;background:${color(pct)}"></div>${pace}</div>
-    <span class="pct">${Math.round(w.pct)}%</span>${when}</div>`;
+    <span class="pct">${Math.round(w.pct)}%</span><span></span>${when}</div>`;
 }
 
-// 数据新旧：右上角小圆点（绿/黄/红）+ 文字；过期或失败时在卡片底部写原因。
+// 数据新旧：右上角圆点（绿/黄/红）+ "N分钟前"；过期或失败时在卡片底部写原因。
 function freshness(a) {
   const ago = a.checkedAt ? Math.max(0, Math.floor((now() - new Date(a.checkedAt)) / 60e3)) : null;
   const stale = ago === null || ago * 60 > a.staleAfter;
   const cls = a.error ? 'err' : stale ? 'stale' : '';
-  const text = ago === null ? '未更新' : ago < 1 ? '刚刚' : ago < 60 ? `${ago}分钟前` : `${Math.floor(ago / 60)}小时前`;
+  const text = ago === null ? '未更新' : ago < 1 ? '刚刚' : ago < 60 ? `${ago} 分钟前` : `${Math.floor(ago / 60)} 小时前`;
   const note = a.error ? `<div class="note err">查询失败：${esc(a.error)}</div>`
              : stale && a.checkedAt ? '<div class="note stale">数据可能已过期</div>' : '';
-  return {side: `<span class="dot ${cls}"></span>${text}`, note};
+  return {side: `<span class="fresh"><span class="dot ${cls}"></span>${text}</span>`, note};
 }
 
-// 名字和套餐分开显示："wexiu (Pro)" -> 名字 wexiu + 标签 Pro
+// "wexiu (Pro)" -> 名字 wexiu + 标签 Pro
 function splitLabel(label) {
   const m = /^(.*) \((\w+)\)$/.exec(label);
   return m ? [m[1], m[2]] : [label, ''];
 }
 
+function renderTools() {
+  const t = [];
+  if (NATIVE) t.push(`<button class="ibtn${pinned ? ' on' : ''}" data-act="pin" title="${pinned ? '取消固定' : '固定：点到别处不自动隐藏'}">${ICON.pin}</button>`);
+  t.push(`<button class="ibtn" data-act="refresh" title="刷新">${ICON.refresh}</button>`);
+  if (NATIVE) t.push(`<button class="ibtn" data-act="close" title="关闭 (Esc)">${ICON.close}</button>`);
+  document.getElementById('tools').innerHTML = t.join('');
+}
+
 function render() {
   if (!state) return;
-  const banner = [state.status, state.note].filter(Boolean).map(t => `<div class="banner">${esc(t)}</div>`).join('');
-  document.getElementById('banner').innerHTML = banner + (state.busy ? '<div class="banner">正在切换…</div>' : '');
+  const msgs = [state.status, state.note].filter(Boolean).map(t => `<div class="banner">${esc(t)}</div>`);
+  if (state.busy) msgs.push('<div class="banner">正在切换，Claude 会自动重启…</div>');
+  if (error) msgs.push(`<div class="banner err">${esc(error)}</div>`);
+  document.getElementById('banner').innerHTML = msgs.join('');
   document.getElementById('chips').innerHTML =
     `<span class="chip">阈值 ${state.threshold}%</span><span class="chip${state.autoSwitch ? ' on' : ''}">自动切换${state.autoSwitch ? '开' : '关'}</span>`;
+  document.getElementById('updated').textContent = '更新于 ' + new Date(state.now).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
   const grid = document.getElementById('grid');
-  if (!state.accounts.length) { grid.innerHTML = '<div class="card empty">还没有账户，请先在 Claude 中登录</div>'; return; }
+  if (!state.accounts.length) { grid.innerHTML = '<div class="card empty">还没有账户，请先在 Claude 中登录</div>'; fit(); return; }
   grid.innerHTML = state.accounts.map((a, i) => {
     const can = !a.active && !state.busy;
     const [name, plan] = splitLabel(a.label);
@@ -158,14 +209,27 @@ function render() {
     if (a.problem) body = `<div class="problem">${esc(PROBLEM_ZH[a.problem] || a.problem)}</div>`;
     else if (!a.session) body = '<div class="note">用量未知</div>';
     else body = windowRow('5h', a.session, SESSION_MS) + windowRow('周', a.weekly, WEEK_MS) + f.note;
-    return `<div class="card${a.active ? ' active' : ''}${can ? ' clickable' : ''}" data-uuid="${esc(a.uuid)}" data-name="${esc(a.label)}">
+    if (confirming === a.uuid && can) body += `<div class="confirm"><span>切换到 ${esc(name)}？Claude 会重启</span>
+      <button class="btn" data-act="cancel">取消</button><button class="btn primary" data-act="switch">切换</button></div>`;
+    return `<div class="card${a.active ? ' active' : ''}${can ? ' clickable' : ''}" data-uuid="${esc(a.uuid)}">
       <div class="head">
         <span class="avatar" style="background:${AVATAR[i % AVATAR.length]}">${esc((name || '?').slice(0, 1).toUpperCase())}</span>
-        <span class="who"><span class="name">${esc(name)}</span><span class="email">${esc(a.email || '')}</span></span>
-        ${plan ? `<span class="plan">${esc(plan)}</span>` : ''}${a.active ? '<span class="tag">当前</span>' : ''}
-        <span class="side">${can ? '<span class="go">切换 →</span>' : ''}${a.problem ? '' : f.side}</span>
+        <div class="who">
+          <div class="line1"><span class="name">${esc(name)}</span>${plan ? `<span class="plan">${esc(plan)}</span>` : ''}${a.active ? '<span class="tag">当前</span>' : ''}</div>
+          <div class="email">${esc(a.email || '')}</div>
+        </div>
+        <div class="side">${a.problem ? '' : f.side}${can && confirming !== a.uuid ? '<span class="go">切换 →</span>' : ''}</div>
       </div>${body}</div>`;
   }).join('');
+  fit();
+}
+
+// 原生窗口按内容高度自适应
+let lastH = 0;
+function fit() {
+  if (typeof window.fitDashboard !== 'function') return;
+  const h = Math.ceil(document.getElementById('app').getBoundingClientRect().height);
+  if (h !== lastH) { lastH = h; window.fitDashboard(h); }
 }
 
 async function load() {
@@ -174,27 +238,39 @@ async function load() {
     if (!r.ok) throw new Error(r.status);
     state = await r.json();
     offset = new Date(state.now) - Date.now();
+    if (error.startsWith('连接失败')) error = '';
     render();
   } catch (e) {
-    document.getElementById('banner').innerHTML = '<div class="banner">连接失败，switcher 可能已退出</div>';
+    error = '连接失败，switcher 可能已退出';
+    render();
   }
 }
 
-document.getElementById('grid').addEventListener('click', async e => {
-  const card = e.target.closest('.card.clickable');
-  if (!card || !confirm(`切换到 ${card.dataset.name}？Claude 桌面 app 会重启。`)) return;
-  const r = await fetch('api/switch', {method: 'POST', headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({uuid: card.dataset.uuid})});
-  if (!r.ok) alert('切换失败：' + (await r.text()));
+async function doSwitch(uuid) {
+  confirming = null;
+  const r = await fetch('api/switch', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({uuid})});
+  error = r.ok ? '' : '切换失败：' + (await r.text());
   load();
+}
+
+document.addEventListener('click', e => {
+  const act = e.target.closest('[data-act]')?.dataset.act;
+  const card = e.target.closest('.card.clickable');
+  if (act === 'close') return window.hideDashboard();
+  if (act === 'pin') { pinned = !pinned; window.pinDashboard(pinned); renderTools(); return; }
+  if (act === 'refresh') return load();
+  if (act === 'cancel') { confirming = null; return render(); }
+  if (act === 'switch' && card) return doSwitch(card.dataset.uuid);
+  if (card) { confirming = card.dataset.uuid; render(); }
 });
 
-// 原生窗口里 Esc 隐藏窗口（hideDashboard 由 WebView2 注入，浏览器里不存在）
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape' && typeof window.hideDashboard === 'function') window.hideDashboard();
+  if (e.key !== 'Escape') return;
+  if (confirming) { confirming = null; render(); }
+  else if (NATIVE) window.hideDashboard();
 });
-if (typeof window.hideDashboard !== 'function') document.getElementById('foot').textContent = '点击其他账户切换 · 竖线 = 窗口已过去的时间';
 
+renderTools();
 load();
 setInterval(load, 15000);
 setInterval(render, 1000);
