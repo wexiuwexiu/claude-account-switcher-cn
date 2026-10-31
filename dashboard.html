@@ -5,142 +5,165 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Claude Account Switcher</title>
 <style>
+  /* iOS 系统色与灰阶（浅色 / 深色） */
   :root {
-    --bg: #f3f3f5; --card: #ffffff; --card-hover: #fafafb; --text: #1b1b1f; --muted: #7c7c84; --faint: #a1a1aa;
-    --line: rgba(0,0,0,.06); --track: rgba(120,120,135,.15); --ok: #22a75a; --warn: #e8930c; --full: #e5484d;
-    --accent: #3b6ef5; --accent-soft: rgba(59,110,245,.08); --accent-line: rgba(59,110,245,.45);
-    --shadow: 0 1px 2px rgba(16,24,40,.04), 0 1px 3px rgba(16,24,40,.06); --btn: rgba(0,0,0,.05); --btn-hover: rgba(0,0,0,.09);
+    --bg: #f2f2f7; --card: #ffffff; --label: #000000; --label2: rgba(60,60,67,.62); --label3: rgba(60,60,67,.32);
+    --sep: rgba(60,60,67,.16); --fill: rgba(120,120,128,.12); --fill-press: rgba(120,120,128,.2);
+    --green: #34c759; --orange: #ff9500; --red: #ff3b30; --blue: #007aff;
+    --shadow: 0 1px 2px rgba(0,0,0,.03), 0 6px 20px rgba(0,0,0,.04);
+    --dim: rgba(0,0,0,.28); --sheet: rgba(249,249,249,.94);
   }
   @media (prefers-color-scheme: dark) {
-    :root { --bg: #1b1b1e; --card: #26262a; --card-hover: #2c2c31; --text: #ededf0; --muted: #9a9aa3; --faint: #6f6f78;
-            --line: rgba(255,255,255,.07); --track: rgba(140,140,155,.22); --accent: #6d93ff; --accent-soft: rgba(109,147,255,.12);
-            --accent-line: rgba(109,147,255,.55); --shadow: none; --btn: rgba(255,255,255,.07); --btn-hover: rgba(255,255,255,.12); }
+    :root { --bg: #000000; --card: #1c1c1e; --label: #ffffff; --label2: rgba(235,235,245,.6); --label3: rgba(235,235,245,.3);
+            --sep: rgba(84,84,88,.55); --fill: rgba(120,120,128,.24); --fill-press: rgba(120,120,128,.34);
+            --green: #30d158; --orange: #ff9f0a; --red: #ff453a; --blue: #0a84ff; --shadow: none;
+            --dim: rgba(0,0,0,.5); --sheet: rgba(44,44,46,.96); }
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; overflow-x: hidden; scrollbar-width: none; }
   ::-webkit-scrollbar { display: none; }
-  body { background: var(--bg); color: var(--text); -webkit-font-smoothing: antialiased; user-select: none;
-         font: 14px/1.45 "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", "Microsoft YaHei", system-ui, sans-serif; }
-  #app { padding: 0 14px 10px; }
+  body { background: var(--bg); color: var(--label); -webkit-font-smoothing: antialiased; user-select: none;
+         font: 15px/1.4 "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", system-ui, sans-serif; }
+  .num { font-family: "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif; font-variant-numeric: tabular-nums; }
+  #app { padding: 6px 16px 14px; position: relative; }
 
-  /* 页面自带标题栏（原生窗口没有系统标题栏） */
-  .titlebar { display: flex; align-items: center; gap: 10px; height: 44px; }
-  .logo { width: 22px; height: 22px; border-radius: 50%; border: 3px solid var(--track); border-top-color: var(--ok); border-right-color: var(--ok); }
-  h1 { font-size: 15px; margin: 0; font-weight: 600; }
-  .chips { display: flex; gap: 6px; margin-left: 4px; }
-  .chip { font-size: 12px; color: var(--muted); background: var(--btn); border-radius: 999px; padding: 2px 9px; }
-  .chip.on { color: var(--accent); background: var(--accent-soft); }
-  .tools { margin-left: auto; display: flex; gap: 2px; }
-  .ibtn { width: 30px; height: 30px; border: 0; border-radius: 8px; background: transparent; color: var(--muted);
-          display: grid; place-items: center; cursor: pointer; }
-  .ibtn:hover { background: var(--btn-hover); color: var(--text); }
-  .ibtn.on { color: var(--accent); background: var(--accent-soft); }
-  .ibtn svg { width: 16px; height: 16px; }
+  /* ---- 大标题 ---- */
+  .header { display: flex; align-items: flex-start; gap: 12px; padding: 10px 2px 14px; }
+  .title h1 { margin: 0; font-size: 28px; font-weight: 700; letter-spacing: -.02em; line-height: 1.15; }
+  .title .meta { margin-top: 3px; font-size: 13px; color: var(--label2); }
+  .title .meta .on { color: var(--green); font-weight: 600; }
+  .tools { margin-left: auto; display: flex; gap: 8px; padding-top: 4px; }
+  .ibtn { width: 32px; height: 32px; border: 0; border-radius: 50%; background: var(--fill); color: var(--label2);
+          display: grid; place-items: center; cursor: pointer; transition: background .15s, transform .1s; }
+  .ibtn:hover { background: var(--fill-press); color: var(--label); }
+  .ibtn:active { transform: scale(.92); }
+  .ibtn.on { background: var(--blue); color: #fff; }
+  .ibtn svg { width: 15px; height: 15px; }
 
-  .banner { background: var(--accent-soft); color: var(--text); padding: 8px 12px; border-radius: 10px; margin-bottom: 8px; font-size: 13px; }
-  .banner.err { background: rgba(229,72,77,.1); }
-  /* ---- 当前账户：大卡片 ---- */
-  .hero { background: var(--card); border-radius: 14px; padding: 18px 20px 20px; box-shadow: var(--shadow);
-          outline: 1.5px solid var(--accent-line); outline-offset: -1.5px; margin-bottom: 12px; }
-  .hero-head { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
-  .avatar { flex: none; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center;
-            font-size: 15px; font-weight: 600; color: #fff; }
-  .hname { font-size: 18px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .plan { flex: none; font-size: 12px; color: var(--muted); background: var(--btn); padding: 0 7px; border-radius: 5px; }
-  .tag { flex: none; font-size: 12px; font-weight: 600; padding: 1px 9px; border-radius: 999px; background: var(--accent); color: #fff; }
-  .fresh { margin-left: auto; display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
-  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); }
-  .dot.stale { background: var(--warn); } .dot.err { background: var(--full); }
+  /* ---- 顶部提示（状态 / 错误） ---- */
+  .toast { display: flex; align-items: center; gap: 8px; background: var(--card); border-radius: 14px; padding: 10px 14px;
+           margin-bottom: 12px; font-size: 14px; box-shadow: var(--shadow); }
+  .toast i { width: 8px; height: 8px; border-radius: 50%; background: var(--blue); flex: none; }
+  .toast.err i { background: var(--red); }
 
-  .big { display: grid; grid-template-columns: 30px 1fr auto; align-items: center; column-gap: 12px; }
-  .big + .big { margin-top: 18px; }
-  .big .lbl { color: var(--muted); font-size: 15px; }
-  .bar { position: relative; border-radius: 6px; background: var(--track); overflow: hidden; }
-  .big .bar { height: 12px; }
-  .fill { height: 100%; border-radius: 6px; transition: width .4s; }
-  /* 竖线：当前窗口已过去的时间比例，用量条超过它说明用得比时间快 */
-  .pace { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--text); opacity: .3; }
-  .big .pct { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; min-width: 72px; text-align: right; line-height: 1.1; }
-  .big.small .bar { height: 8px; }
-  .big.small .pct { font-size: 19px; }
-  .big .when { grid-column: 2 / 4; margin-top: 6px; font-size: 14px; color: var(--muted); font-variant-numeric: tabular-nums; }
-  .big .when b { color: var(--text); font-weight: 600; }
-  .problem { color: var(--muted); font-size: 14px; background: var(--btn); border-radius: 8px; padding: 8px 12px; }
+  /* ---- 分组标题与卡片 ---- */
+  .caption { font-size: 13px; color: var(--label2); padding: 0 16px 6px; letter-spacing: .02em; }
+  .group { background: var(--card); border-radius: 20px; box-shadow: var(--shadow); overflow: hidden; margin-bottom: 22px; }
 
-  /* ---- 其他账户：每个一行，按可用程度排序 ---- */
-  .others { background: var(--card); border-radius: 14px; box-shadow: var(--shadow); overflow: hidden; }
-  /* 第一行：头像 | 名字 | 5h | 周；第二行：状态 | 5h 重置 | 周重置；可选第三行：推荐理由 */
-  .acc { display: grid; grid-template-columns: 26px 96px minmax(0, 1fr) minmax(0, 1fr); align-items: center;
-         column-gap: 10px; row-gap: 6px; padding: 15px 16px; font-size: 15px; }
-  .acc .avatar { grid-row: 1 / 3; align-self: center; }
-  .acc.rec { background: var(--accent-soft); }
-  .acc.rec.clickable:hover { background: var(--accent-soft); filter: brightness(.98); }
-  .rtag { font-size: 11px; font-weight: 600; color: #fff; background: var(--accent); border-radius: 999px; padding: 0 7px; margin-left: 6px; vertical-align: 2px; }
-  .sub { font-size: 14px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
-  .sub b { color: var(--warn); font-weight: 600; }
-  .why { grid-column: 2 / 5; font-size: 13px; color: var(--accent); margin-top: 4px; }
-  .acc + .acc, .acc + .confirm, .confirm + .acc { border-top: 1px solid var(--line); }
-  .acc.clickable { cursor: pointer; }
-  .acc.clickable:hover { background: var(--card-hover); }
-  .acc .avatar { width: 26px; height: 26px; font-size: 13px; }
-  .acc .name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .acc .status { text-align: left; font-size: 14px; }
-  .mini { display: grid; grid-template-columns: 18px 1fr 42px; align-items: center; column-gap: 6px; }
-  .mini .lbl { color: var(--muted); font-size: 12px; }
-  .mini .bar { height: 6px; }
-  .mini .pct { text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
-  .wk { text-align: right; font-variant-numeric: tabular-nums; }
-  .wk .lbl { color: var(--muted); font-size: 12px; margin-right: 4px; }
-  .status { text-align: right; font-size: 14px; font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; }
-  .status.ok { color: var(--ok); } .status.wait { color: var(--warn); } .status.off { color: var(--muted); font-weight: 400; }
+  /* ---- 当前账户：活动圆环 + 两个窗口 ---- */
+  .hero { display: grid; grid-template-columns: 132px 1fr; gap: 18px; align-items: center; padding: 18px 20px; }
+  .rings { position: relative; width: 132px; height: 132px; }
+  .rings svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+  .rings .center { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; }
+  .rings .center b { font-size: 30px; font-weight: 700; letter-spacing: -.02em; line-height: 1; }
+  .rings .center span { font-size: 12px; color: var(--label2); margin-top: 3px; }
+  .track { fill: none; opacity: .18; }
+  .prog { fill: none; stroke-linecap: round; }
+  .intro .prog { animation: draw .9s cubic-bezier(.2,.8,.2,1) both; }
+  @keyframes draw { from { stroke-dashoffset: 100; } }
 
-  .confirm { display: flex; align-items: center; gap: 8px; padding: 10px 16px; background: var(--accent-soft); font-size: 14px; }
-  .confirm span { flex: 1; }
-  .btn { border: 0; border-radius: 8px; padding: 6px 14px; font: inherit; font-size: 14px; cursor: pointer; background: var(--btn); color: var(--text); }
-  .btn:hover { background: var(--btn-hover); }
-  .btn.primary { background: var(--accent); color: #fff; font-weight: 600; }
-  .btn.primary:hover { filter: brightness(1.08); }
+  .who { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; min-width: 0; }
+  .who .name { font-size: 21px; font-weight: 700; letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pill { flex: none; font-size: 12px; font-weight: 600; padding: 2px 9px; border-radius: 999px; }
+  .pill.blue { background: var(--blue); color: #fff; }
+  .pill.green { background: color-mix(in srgb, var(--green) 16%, transparent); color: var(--green); }
+  .pill.orange { background: color-mix(in srgb, var(--orange) 16%, transparent); color: var(--orange); }
+  .pill.gray { background: var(--fill); color: var(--label2); }
+  .who .fresh { margin-left: auto; display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--label2); flex: none; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); }
+  .dot.stale { background: var(--orange); } .dot.err { background: var(--red); }
 
-  /* ---- 异常提示：只在出问题时出现 ---- */
-  .alerts { margin-top: 10px; display: flex; flex-direction: column; gap: 4px; }
-  .alerts:empty { display: none; }
-  .alert { font-size: 13px; padding: 6px 12px; border-radius: 8px; }
-  .alert.stale { color: var(--warn); background: rgba(232,147,12,.1); }
-  .alert.err { color: var(--full); background: rgba(229,72,77,.1); }
+  .stat + .stat { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--sep); }
+  .stat .top { display: flex; align-items: baseline; gap: 8px; }
+  .stat .key { display: flex; align-items: center; gap: 7px; font-size: 14px; font-weight: 600; }
+  .stat .key i { width: 10px; height: 10px; border-radius: 50%; }
+  .stat .val { margin-left: auto; font-size: 22px; font-weight: 700; letter-spacing: -.01em; }
+  .stat .when { font-size: 13px; color: var(--label2); margin-top: 1px; }
+  .stat .when b { color: var(--orange); font-weight: 600; }
+  .problem { padding: 16px 20px; color: var(--label2); font-size: 14px; }
 
-  .empty { text-align: center; color: var(--muted); padding: 28px 0; background: var(--card); border-radius: 14px; }
-  .foot { margin-top: 10px; color: var(--faint); font-size: 12px; display: flex; justify-content: space-between; }
+  /* ---- 其他账户：分组列表 ---- */
+  .row { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto 14px; align-items: center; column-gap: 12px;
+         padding: 12px 14px 12px 16px; position: relative; cursor: pointer; transition: background .12s; }
+  .row:hover { background: color-mix(in srgb, var(--fill) 50%, transparent); }
+  .row:active { background: var(--fill-press); }
+  .row.disabled { cursor: default; }
+  .row + .row::before { content: ''; position: absolute; top: 0; left: 68px; right: 0; height: 1px; background: var(--sep); }
+  .row.rec { background: color-mix(in srgb, var(--blue) 7%, transparent); }
+  .avatar { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; color: #fff;
+            font-size: 17px; font-weight: 600; box-shadow: inset 0 0 0 .5px rgba(0,0,0,.08); }
+  .info { min-width: 0; }
+  .info .l1 { display: flex; align-items: center; gap: 7px; min-width: 0; }
+  .info .nm { font-size: 16px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .info .l2 { font-size: 13px; color: var(--label2); margin-top: 3px; line-height: 1.45; font-variant-numeric: tabular-nums; }
+  .info .l2 b { color: var(--orange); font-weight: 600; }
+  .info .l2 .k { display: inline-block; width: 30px; color: var(--label3); }
+  .info .why { font-size: 13px; color: var(--blue); margin-top: 3px; }
+  .minis { display: flex; gap: 10px; }
+  .mini { width: 42px; text-align: center; }
+  .mini .ring { position: relative; width: 42px; height: 42px; }
+  .mini svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+  .mini .pct { position: absolute; inset: 0; display: grid; place-items: center; font-size: 12px; font-weight: 700; }
+  .mini .lab { font-size: 11px; color: var(--label3); margin-top: 2px; }
+  .chev { color: var(--label3); }
+  .chev svg { width: 8px; height: 13px; display: block; }
+
+  /* ---- 需要注意：只在异常时出现 ---- */
+  .alert { display: grid; grid-template-columns: 26px 1fr; gap: 10px; align-items: start; padding: 11px 16px; font-size: 14px; }
+  .alert + .alert { border-top: 1px solid var(--sep); }
+  .alert .ic { width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; color: #fff; font-weight: 700; font-size: 14px; }
+  .alert.stale .ic { background: var(--orange); } .alert.err .ic { background: var(--red); }
+  .alert .tx { padding-top: 3px; color: var(--label); }
+  .alert .tx span { color: var(--label2); }
+
+  .empty { padding: 30px 20px; text-align: center; color: var(--label2); }
+  .foot { text-align: center; font-size: 12px; color: var(--label3); margin-top: -8px; }
+
+  /* ---- 切换确认：iOS 操作表 ---- */
+  .sheet-wrap { position: absolute; inset: 0; background: var(--dim); display: flex; flex-direction: column; justify-content: flex-end;
+                padding: 0 12px 12px; animation: fade .18s ease both; }
+  .sheet-wrap.hide { display: none; }
+  .sheet { background: var(--sheet); border-radius: 16px; overflow: hidden; backdrop-filter: blur(20px); text-align: center;
+           animation: up .26s cubic-bezier(.2,.9,.25,1) both; }
+  .sheet .msg { padding: 14px 18px 12px; font-size: 13px; color: var(--label2); border-bottom: 1px solid var(--sep); }
+  .sheet .msg b { display: block; font-size: 15px; color: var(--label); margin-bottom: 3px; }
+  .sheet button { display: block; width: 100%; border: 0; background: transparent; padding: 15px; font: inherit; font-size: 18px; color: var(--blue); cursor: pointer; }
+  .sheet button:active { background: var(--fill-press); }
+  .sheet.cancel { margin-top: 8px; animation-delay: .03s; }
+  .sheet.cancel button { font-weight: 600; }
+  @keyframes fade { from { opacity: 0; } }
+  @keyframes up { from { transform: translateY(40px); opacity: 0; } }
 </style>
 </head>
 <body>
-<div id="app">
-  <div class="titlebar">
-    <div class="logo"></div>
-    <h1>账户用量</h1>
-    <div class="chips" id="chips"></div>
+<div id="app" class="intro">
+  <div class="header">
+    <div class="title"><h1>账户</h1><div class="meta" id="meta"></div></div>
     <div class="tools" id="tools"></div>
   </div>
-  <div id="banner"></div>
-  <div class="list" id="grid"></div>
-  <div class="alerts" id="alerts"></div>
-  <div class="foot"><span>点一行切换 · 悬停看邮箱和登录有效期 · 竖线 = 窗口已过去的时间</span><span id="updated"></span></div>
+  <div id="toasts"></div>
+  <div id="main"></div>
+  <div class="foot">点按账户切换 · 悬停查看邮箱与登录有效期</div>
+  <div class="sheet-wrap hide" id="sheet"></div>
 </div>
 
 <script>
-// 页面数据来自同目录 api/state；倒计时每秒在本地更新，不额外请求。
-// 在原生窗口里，WebView2 注入 hideDashboard / pinDashboard / fitDashboard；浏览器里没有这些函数。
+// 数据来自同目录 api/state，每 15 秒刷新；倒计时每秒只更新文字，不重绘整页（圆环动画只在首次出现）。
+// 原生窗口里 WebView2 注入 hideDashboard / pinDashboard / fitDashboard；浏览器里没有这些函数。
 const SESSION_MS = 5 * 3600e3, WEEK_MS = 7 * 24 * 3600e3;
-const AVATAR = ['#5b7cfa', '#9b7bf0', '#e66aa8', '#f08a45', '#2fb98a', '#1fb5cf', '#d4a20b', '#8691a3'];
+// 头像渐变（iOS 联系人风格），按账户在原列表里的位置固定
+const AVATAR = [['#5e9cff','#2f6bff'], ['#b18cff','#7a4dff'], ['#ff8fc0','#ff4f93'], ['#ffb066','#ff7a1a'],
+                ['#4fdc8a','#14b25e'], ['#5fd8ef','#11a8cc'], ['#ffd25e','#f2a900'], ['#a9b4c4','#738196']];
 const NATIVE = typeof window.hideDashboard === 'function';
-// 后端的英文提示（托盘菜单也用）在页面上换成中文
 const PROBLEM_ZH = {
   'web sign-in only; usage shows after Pro + one use of the Code tab': '仅网页登录：开通 Pro 并在 Code 标签页用一次后显示用量',
   'signed out, add it again': '登录已失效，请重新添加',
 };
 const ICON = {
-  pin: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9.5 2.5l4 4-2 1-2.5 2.5.5 3-1 1-3-3-3 3M5 8.5l2.5-2.5 1-2z" stroke-linejoin="round"/></svg>',
-  close: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4l8 8M12 4l-8 8" stroke-linecap="round"/></svg>',
-  refresh: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13 8a5 5 0 1 1-1.5-3.6M13 2.5v2.5h-2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  pin: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9.5 2.5l4 4-2 1-2.5 2.5.5 3-1 1-3-3-3 3M5 8.5l2.5-2.5 1-2z" stroke-linejoin="round"/></svg>',
+  close: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7" stroke-linecap="round"/></svg>',
+  refresh: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M13 8a5 5 0 1 1-1.5-3.6M13 2.5v2.5h-2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  chev: '<svg viewBox="0 0 8 13" fill="none" stroke="currentColor" stroke-width="2"><path d="M1.5 1.5l5 5-5 5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
 };
 let state = null, offset = 0;   // offset: 服务器时间 - 本地时间，避免本机时钟偏差
 let confirming = null, pinned = false, error = '';
@@ -149,10 +172,12 @@ const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>'
 const pad = n => String(n).padStart(2, '0');
 const now = () => Date.now() + offset;
 
-function color(pct) {
-  if (pct >= state.threshold) return 'var(--full)';
-  if (pct >= state.warnAt) return 'var(--warn)';
-  return 'var(--ok)';
+// 用量颜色：像 Apple 活动圆环一样每个窗口有自己的色相（5 小时绿、本周蓝），
+// 接近用满时统一变橙（≥ 预警线）、变红（≥ 阈值）。
+function tone(pct, base) {
+  if (pct >= state.threshold) return 'var(--red)';
+  if (pct >= state.warnAt) return 'var(--orange)';
+  return base === 'week' ? 'var(--blue)' : 'var(--green)';
 }
 
 // 时间始终带周几："今天 周六 23:40"、"明天 周日 02:10"、"周二 17:59"、"11-07 周六 03:00"
@@ -173,50 +198,56 @@ function countdown(ms) {
   if (h > 0) return `${h} 小时 ${mm} 分`;
   return `${mm} 分钟`;
 }
+// 倒计时占位：tick() 每秒按 data-until 刷新文字
+const cd = iso => `<span data-until="${iso}">${countdown(new Date(iso) - now())}</span>`;
 
-// 账户能否立刻使用：任一窗口达到阈值就要等它重置（取较晚的那个）。
+// 圆环：pathLength=100，dashoffset 表示未用部分；同色淡轨道
+function ring(r, width, pct, color) {
+  const p = Math.max(0, Math.min(100, pct));
+  return `<circle class="track" cx="50" cy="50" r="${r}" stroke="${color}" stroke-width="${width}"/>
+    <circle class="prog" cx="50" cy="50" r="${r}" stroke="${color}" stroke-width="${width}" pathLength="100"
+      stroke-dasharray="100" stroke-dashoffset="${100 - p}" style="${p === 0 ? 'opacity:0' : ''}"/>`;
+}
+
+// 账户能否立刻使用：任一窗口达到阈值就要等它重置（取较晚的那个）
 function availability(a) {
-  if (a.problem) return {cls: 'off', text: a.pending ? '仅网页登录' : '需处理', rank: 3, until: Infinity};
-  if (!a.session) return {cls: 'off', text: '用量未知', rank: 2, until: Infinity};
+  if (a.problem) return {pill: 'gray', text: a.pending ? '仅网页登录' : '需处理', rank: 3, until: Infinity};
+  if (!a.session) return {pill: 'gray', text: '用量未知', rank: 2, until: Infinity};
   const blocked = [a.session, a.weekly].filter(w => w && w.pct >= state.threshold);
-  if (!blocked.length) return {cls: 'ok', text: '可用 ✓', rank: 0, until: 0, peak: Math.max(a.session.pct, a.weekly ? a.weekly.pct : 0)};
+  if (!blocked.length) return {pill: 'green', text: '可用', rank: 0, until: 0, peak: Math.max(a.session.pct, a.weekly ? a.weekly.pct : 0)};
   const until = Math.max(...blocked.map(w => w.reset ? new Date(w.reset).getTime() : Infinity));
-  // 恢复时间已写在下面对应窗口的小字里，这里只给结论
-  return {cls: 'wait', text: '已用满', rank: 1, until};
+  return {pill: 'orange', text: '已用满', rank: 1, until};
 }
 
-function pace(w, spanMs) {
-  if (!w || !w.reset) return '';
-  const elapsed = Math.max(0, Math.min(1, 1 - (new Date(w.reset) - now()) / spanMs));
-  return `<div class="pace" style="left:calc(${(elapsed * 100).toFixed(1)}% - 1px)"></div>`;
-}
-
-function bar(w) {
-  const pct = Math.max(0, Math.min(100, w.pct));
-  return `<div class="fill" style="width:${pct}%;background:${color(pct)}"></div>`;
-}
-
-// 大卡片里的一行：标签 | 粗进度条 | 大号百分比，下面一行写重置时间。
-function bigRow(label, w, spanMs, small) {
-  if (!w) return '';
-  let when = '窗口未开始';
-  if (w.reset) {
-    const at = new Date(w.reset), left = at - now();
-    when = w.pct >= state.threshold ? `<b>${absTime(at)}</b> 恢复 · 还剩 ${countdown(left)}`
-                                    : `${absTime(at)} 重置 · 还剩 ${countdown(left)}`;
+// 推荐切到哪个号（当前账户用到一半以上才给）：
+// 1) 周额度 2 天内重置、还剩 20% 以上没用的号，先用掉，否则作废；取最早重置的。
+// 2) 否则取 5h 剩余最多的；差不多时（15% 以内）选 5h 窗口最先重置的。周用量接近阈值的号不参与第 2 条。
+function recommend(active, list) {
+  const cur = active && active.session;
+  const busy = !active || !cur || cur.pct >= 50 || (active.weekly && active.weekly.pct >= state.threshold);
+  if (!busy) return null;
+  const ok = list.filter(a => availability(a).rank === 0);
+  if (!ok.length) return null;
+  const t = now(), weekLeft = a => a.weekly && a.weekly.reset ? new Date(a.weekly.reset) - t : Infinity;
+  const expiring = ok.filter(a => weekLeft(a) < 2 * 864e5 && 100 - a.weekly.pct >= 20).sort((x, y) => weekLeft(x) - weekLeft(y));
+  if (expiring.length) {
+    const a = expiring[0];
+    return {uuid: a.uuid, why: `周额度 ${countdown(weekLeft(a))}后重置，还剩 ${Math.round(100 - a.weekly.pct)}% 没用，先用掉`};
   }
-  return `<div class="big${small ? ' small' : ''}"><span class="lbl">${label}</span>
-    <div class="bar">${bar(w)}${pace(w, spanMs)}</div><span class="pct">${Math.round(w.pct)}%</span>
-    <div class="when">${when}</div></div>`;
+  const roomy = ok.filter(a => !a.weekly || a.weekly.pct < state.threshold - 10);
+  const pool = roomy.length ? roomy : ok;
+  const room = a => 100 - a.session.pct, resetIn = a => a.session.reset ? new Date(a.session.reset) - t : SESSION_MS;
+  const best = Math.max(...pool.map(room));
+  const a = pool.filter(x => room(x) >= best - 15).sort((x, y) => resetIn(x) - resetIn(y))[0];
+  return {uuid: a.uuid, why: `5 小时额度还剩 ${Math.round(room(a))}%` + (a.session.reset ? `，${absTime(new Date(a.session.reset))} 就会重置` : '')};
 }
 
-// 数据新旧：绿=新，黄=过期，红=查询失败
+// 数据新旧：绿=新，橙=过期，红=查询失败
 function freshDot(a) {
   const ago = a.checkedAt ? Math.max(0, Math.floor((now() - new Date(a.checkedAt)) / 60e3)) : null;
   const stale = ago === null || ago * 60 > a.staleAfter;
-  const cls = a.error ? 'err' : stale ? 'stale' : '';
-  const text = ago === null ? '未更新' : ago < 1 ? '刚刚' : ago < 60 ? `${ago} 分钟前` : `${Math.floor(ago / 60)} 小时前`;
-  return {cls, text, stale};
+  return {cls: a.error ? 'err' : stale ? 'stale' : '', stale,
+          text: ago === null ? '未更新' : ago < 1 ? '刚刚' : ago < 60 ? `${ago} 分钟前` : `${Math.floor(ago / 60)} 小时前`};
 }
 
 function tokenInfo(a) {
@@ -227,24 +258,77 @@ function tokenInfo(a) {
 
 // 悬停提示：邮箱、套餐、登录 token、数据更新时间
 function hoverText(a, plan) {
-  const t = tokenInfo(a), f = freshDot(a);
-  return [a.email, plan && '套餐 ' + plan, t && `登录 token 至 ${t.date}`, '数据 ' + f.text].filter(Boolean).join('\n');
+  const t = tokenInfo(a);
+  return [a.email, plan && '套餐 ' + plan, t && `登录 token 至 ${t.date}`, '数据 ' + freshDot(a).text].filter(Boolean).join('\n');
 }
 
-// 只在出问题时出现的提示：查询失败、数据过期、token 将到期/已到期
+// 只在出问题时出现：查询失败、数据过期、token 将到期 / 已到期
 function alertsFor(a, name) {
   const out = [], t = tokenInfo(a), f = freshDot(a);
-  if (a.error) out.push(['err', `${name}：查询失败（${a.error}）`]);
-  else if (f.stale && a.checkedAt && !a.problem) out.push(['stale', `${name}：用量数据 ${f.text}，可能已过期`]);
-  if (t && t.left <= 0) out.push(['err', `${name}：登录 token 已于 ${t.date} 到期，尽快切过去让 Claude 续期`]);
-  else if (t && t.days < 7) out.push(['stale', `${name}：登录 token ${t.days} 天后到期，近期切过去用一下即可续期`]);
+  if (a.error) out.push(['err', name, `查询失败（${a.error}）`]);
+  else if (f.stale && a.checkedAt && !a.problem) out.push(['stale', name, `用量数据 ${f.text}，可能已过期`]);
+  if (t && t.left <= 0) out.push(['err', name, `登录 token 已于 ${t.date} 到期，尽快切过去让 Claude 续期`]);
+  else if (t && t.days < 7) out.push(['stale', name, `登录 token ${t.days} 天后到期，近期切过去用一下即可续期`]);
   return out;
 }
 
-// "wexiu (Pro)" -> 名字 wexiu + 标签 Pro
 function splitLabel(label) {
   const m = /^(.*) \((\w+)\)$/.exec(label);
   return m ? [m[1], m[2]] : [label, ''];
+}
+
+function avatar(a, name) {
+  const [c1, c2] = AVATAR[state.accounts.indexOf(a) % AVATAR.length];
+  return `<span class="avatar" style="background:linear-gradient(160deg,${c1},${c2})">${esc((name || '?').slice(0, 1).toUpperCase())}</span>`;
+}
+
+// 某个窗口的重置描述：被用满时写"恢复"并标橙
+function whenText(w, withCountdown) {
+  if (!w) return '';
+  if (!w.reset) return '窗口未开始';
+  const t = absTime(new Date(w.reset)), full = w.pct >= state.threshold;
+  const main = full ? `<b>${t} 恢复</b>` : `${t} 重置`;
+  return withCountdown ? `${main} · 还剩 ${cd(w.reset)}` : main;
+}
+
+function heroCard(a) {
+  const [name, plan] = splitLabel(a.label), f = freshDot(a);
+  const head = `<div class="who"><span class="name">${esc(name)}</span><span class="pill blue">当前</span>
+    ${plan ? `<span class="pill gray">${esc(plan)}</span>` : ''}<span class="fresh"><span class="dot ${f.cls}"></span>${f.text}</span></div>`;
+  if (a.problem || !a.session) {
+    return `<div class="group" title="${esc(hoverText(a, plan))}"><div class="problem">${head}${esc(a.problem ? (PROBLEM_ZH[a.problem] || a.problem) : '用量未知')}</div></div>`;
+  }
+  const s = a.session, w = a.weekly || {pct: 0};
+  const cs = tone(s.pct, 'session'), cw = tone(w.pct, 'week');
+  const stat = (key, color, win) => `<div class="stat"><div class="top"><span class="key"><i style="background:${color}"></i>${key}</span>
+      <span class="val num">${Math.round(win.pct)}%</span></div><div class="when">${whenText(win, true)}</div></div>`;
+  return `<div class="group" title="${esc(hoverText(a, plan))}"><div class="hero">
+    <div class="rings"><svg viewBox="0 0 100 100">${ring(43, 11, s.pct, cs)}${ring(29.5, 11, w.pct, cw)}</svg>
+      <div class="center"><b class="num">${Math.round(s.pct)}%</b><span>5 小时</span></div></div>
+    <div>${head}${stat('5 小时', cs, s)}${a.weekly ? stat('本周', cw, a.weekly) : ''}</div></div></div>`;
+}
+
+function miniRing(label, w, base) {
+  if (!w) return '';
+  const c = tone(w.pct, base);
+  return `<div class="mini"><div class="ring"><svg viewBox="0 0 100 100">${ring(40, 14, w.pct, c)}</svg>
+    <span class="pct num">${Math.round(w.pct)}</span></div><div class="lab">${label}</div></div>`;
+}
+
+function accRow(a, rec) {
+  const [name, plan] = splitLabel(a.label), av = availability(a), isRec = rec && rec.uuid === a.uuid;
+  const can = !state.busy;
+  const pill = isRec ? '<span class="pill blue">推荐</span>' : `<span class="pill ${av.pill}">${av.text}</span>`;
+  let l2;
+  if (a.problem) l2 = esc(PROBLEM_ZH[a.problem] || a.problem);
+  else if (!a.session) l2 = '用量未知';
+  else l2 = `<span class="k">5 时</span>${whenText(a.session)}<br><span class="k">本周</span>${whenText(a.weekly)}`;
+  return `<div class="row${isRec ? ' rec' : ''}${can ? '' : ' disabled'}" data-uuid="${esc(a.uuid)}" title="${esc(hoverText(a, plan))}">
+    ${avatar(a, name)}
+    <div class="info"><div class="l1"><span class="nm">${esc(name)}</span>${pill}</div>
+      <div class="l2">${l2}</div>${isRec ? `<div class="why">${esc(rec.why)}</div>` : ''}</div>
+    <div class="minis">${miniRing('5 时', a.session, 'session')}${miniRing('本周', a.weekly, 'week')}</div>
+    <span class="chev">${ICON.chev}</span></div>`;
 }
 
 function renderTools() {
@@ -255,103 +339,52 @@ function renderTools() {
   document.getElementById('tools').innerHTML = t.join('');
 }
 
-// 头像颜色按账户在原列表里的位置固定，排序变化时不跟着变
-function avatar(a, name) {
-  const i = state.accounts.indexOf(a);
-  return `<span class="avatar" style="background:${AVATAR[i % AVATAR.length]}">${esc((name || '?').slice(0, 1).toUpperCase())}</span>`;
-}
-
-function heroCard(a) {
-  const [name, plan] = splitLabel(a.label), f = freshDot(a);
-  let body;
-  if (a.problem) body = `<div class="problem">${esc(PROBLEM_ZH[a.problem] || a.problem)}</div>`;
-  else if (!a.session) body = '<div class="problem">用量未知</div>';
-  else body = bigRow('5h', a.session, SESSION_MS, false) + bigRow('周', a.weekly, WEEK_MS, true);
-  return `<div class="hero" title="${esc(hoverText(a, plan))}">
-    <div class="hero-head">${avatar(a, name)}<span class="hname">${esc(name)}</span>${plan ? `<span class="plan">${esc(plan)}</span>` : ''}
-      <span class="tag">当前</span><span class="fresh"><span class="dot ${f.cls}"></span>${f.text}</span></div>${body}</div>`;
-}
-
-// 每个窗口下面那行小字：重置时间；被用满的写"恢复"并标橙。
-function resetText(w) {
-  if (!w) return '';
-  if (!w.reset) return '未开始';
-  const t = absTime(new Date(w.reset));
-  return w.pct >= state.threshold ? `<b>${t} 恢复</b>` : `${t} 重置`;
-}
-
-// 推荐切到哪个号（只在当前账户用得较多时给出）：
-// 1) 周额度 2 天内重置、还剩 20% 以上没用的号，先用掉，否则作废；取最早重置的。
-// 2) 否则取 5h 剩余最多的；差不多时（15% 以内）选 5h 窗口最先重置的，用完很快又能满额。
-// 周用量已接近阈值的号不参与第 2 条。
-function recommend(active, list) {
-  const cur = active && active.session;
-  const busy = !active || !cur || cur.pct >= 50 || (active.weekly && active.weekly.pct >= state.threshold);
-  if (!busy) return null;
-  const ok = list.filter(a => availability(a).rank === 0);
-  if (!ok.length) return null;
-  const nowMs = now(), weekLeft = a => a.weekly && a.weekly.reset ? new Date(a.weekly.reset) - nowMs : Infinity;
-  const expiring = ok.filter(a => weekLeft(a) < 2 * 864e5 && 100 - a.weekly.pct >= 20)
-                     .sort((x, y) => weekLeft(x) - weekLeft(y));
-  if (expiring.length) {
-    const a = expiring[0];
-    return {uuid: a.uuid, why: `周额度 ${countdown(weekLeft(a))}后重置，还剩 ${Math.round(100 - a.weekly.pct)}% 没用，先用掉`};
-  }
-  const roomy = ok.filter(a => !a.weekly || a.weekly.pct < state.threshold - 10);
-  const pool = roomy.length ? roomy : ok;
-  const room = a => 100 - a.session.pct;
-  const resetIn = a => a.session.reset ? new Date(a.session.reset) - nowMs : SESSION_MS;
-  const best = Math.max(...pool.map(room));
-  const a = pool.filter(x => room(x) >= best - 15).sort((x, y) => resetIn(x) - resetIn(y))[0];
-  const when = a.session.reset ? `，${absTime(new Date(a.session.reset))} 就会重置` : '（窗口未开始）';
-  return {uuid: a.uuid, why: `5h 还剩 ${Math.round(room(a))}%${when}`};
-}
-
-function accRow(a, rec) {
-  const [name, plan] = splitLabel(a.label), av = availability(a), can = !state.busy;
-  const isRec = rec && rec.uuid === a.uuid;
-  const mini = (label, w, span) => w
-    ? `<div class="mini"><span class="lbl">${label}</span><div class="bar">${bar(w)}${pace(w, span)}</div><span class="pct">${Math.round(w.pct)}%</span></div>`
-    : '<span></span>';
-  let html = `<div class="acc${can ? ' clickable' : ''}${isRec ? ' rec' : ''}" data-uuid="${esc(a.uuid)}" title="${esc(hoverText(a, plan))}">
-    ${avatar(a, name)}<span class="name">${esc(name)}${isRec ? '<span class="rtag">推荐</span>' : ''}</span>
-    ${mini('5h', a.session, SESSION_MS)}${mini('周', a.weekly, WEEK_MS)}
-    <span class="status ${av.cls}">${av.text}</span>
-    <span class="sub">${a.session ? resetText(a.session) : ''}</span><span class="sub">${a.weekly ? resetText(a.weekly) : ''}</span>
-    ${isRec ? `<div class="why">↳ ${esc(rec.why)}</div>` : ''}</div>`;
-  if (confirming === a.uuid && can) html += `<div class="confirm" data-uuid="${esc(a.uuid)}"><span>切换到 ${esc(name)}？Claude 会重启</span>
-    <button class="btn" data-act="cancel">取消</button><button class="btn primary" data-act="switch">切换</button></div>`;
-  return html;
+function renderSheet() {
+  const el = document.getElementById('sheet');
+  const a = state && state.accounts.find(x => x.uuid === confirming);
+  if (!a || state.busy) { el.className = 'sheet-wrap hide'; el.innerHTML = ''; return; }
+  const [name] = splitLabel(a.label);
+  el.className = 'sheet-wrap';
+  el.innerHTML = `<div class="sheet"><div class="msg"><b>切换到 ${esc(name)}？</b>Claude 会重启，正在生成的回复会中断</div>
+    <button data-act="switch">切换</button></div><div class="sheet cancel"><button data-act="cancel">取消</button></div>`;
 }
 
 function render() {
   if (!state) return;
-  const msgs = [state.status, state.note].filter(Boolean).map(t => `<div class="banner">${esc(t)}</div>`);
-  if (state.busy) msgs.push('<div class="banner">正在切换，Claude 会自动重启…</div>');
-  if (error) msgs.push(`<div class="banner err">${esc(error)}</div>`);
-  document.getElementById('banner').innerHTML = msgs.join('');
-  document.getElementById('chips').innerHTML =
-    `<span class="chip">阈值 ${state.threshold}%</span><span class="chip${state.autoSwitch ? ' on' : ''}">自动切换${state.autoSwitch ? '开' : '关'}</span>`;
-  document.getElementById('updated').textContent = '更新于 ' + new Date(state.now).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
-  const grid = document.getElementById('grid');
+  document.getElementById('meta').innerHTML =
+    `阈值 ${state.threshold}% · 自动切换 <span class="${state.autoSwitch ? 'on' : ''}">${state.autoSwitch ? '开' : '关'}</span> · 更新于 ` +
+    new Date(state.now).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+  const toasts = [state.status, state.note].filter(Boolean).map(t => `<div class="toast"><i></i>${esc(t)}</div>`);
+  if (state.busy) toasts.push('<div class="toast"><i></i>正在切换，Claude 会自动重启…</div>');
+  if (error) toasts.push(`<div class="toast err"><i></i>${esc(error)}</div>`);
+  document.getElementById('toasts').innerHTML = toasts.join('');
+
+  const main = document.getElementById('main');
   if (!state.accounts.length) {
-    grid.innerHTML = '<div class="empty">还没有账户，请先在 Claude 中登录</div>';
-    document.getElementById('alerts').innerHTML = '';
-    fit(); return;
+    main.innerHTML = '<div class="group"><div class="empty">还没有账户，请先在 Claude 中登录</div></div>';
+    renderSheet(); fit(); return;
   }
   const active = state.accounts.find(a => a.active);
-  // 其他账户：可用的在前（用得少的更前），再按恢复时间先后，最后是无法使用的
+  // 其他账户：可用的在前（用得少的更前），再按恢复时间，最后是无法使用的；推荐的排第一
   const others = state.accounts.filter(a => a !== active).map(a => ({a, av: availability(a)}))
-    .sort((x, y) => x.av.rank - y.av.rank || (x.av.rank === 0 ? x.av.peak - y.av.peak : x.av.until - y.av.until))
-    .map(x => x.a);
-  // 推荐的号排到第一位
+    .sort((x, y) => x.av.rank - y.av.rank || (x.av.rank === 0 ? x.av.peak - y.av.peak : x.av.until - y.av.until)).map(x => x.a);
   const rec = recommend(active, others);
   if (rec) others.sort((x, y) => (y.uuid === rec.uuid) - (x.uuid === rec.uuid));
-  grid.innerHTML = (active ? heroCard(active) : '') +
-    (others.length ? `<div class="others">${others.map(a => accRow(a, rec)).join('')}</div>` : '');
   const alerts = state.accounts.flatMap(a => alertsFor(a, splitLabel(a.label)[0]));
-  document.getElementById('alerts').innerHTML = alerts.map(([cls, t]) => `<div class="alert ${cls}">⚠ ${esc(t)}</div>`).join('');
+
+  let html = '';
+  if (active) html += `<div class="caption">当前账户</div>${heroCard(active)}`;
+  if (others.length) html += `<div class="caption">${active ? '切换到' : '账户'}</div><div class="group">${others.map(a => accRow(a, rec)).join('')}</div>`;
+  if (alerts.length) html += `<div class="caption">需要注意</div><div class="group">${alerts.map(([cls, n, t]) =>
+    `<div class="alert ${cls}"><span class="ic">!</span><div class="tx">${esc(n)}<br><span>${esc(t)}</span></div></div>`).join('')}</div>`;
+  main.innerHTML = html;
+  renderSheet();
   fit();
+}
+
+// 每秒只刷新倒计时文字
+function tick() {
+  document.querySelectorAll('[data-until]').forEach(el => { el.textContent = countdown(new Date(el.dataset.until) - now()); });
 }
 
 // 原生窗口按内容高度自适应
@@ -369,15 +402,17 @@ async function load() {
     state = await r.json();
     offset = new Date(state.now) - Date.now();
     if (error.startsWith('连接失败')) error = '';
-    render();
   } catch (e) {
     error = '连接失败，switcher 可能已退出';
-    render();
   }
+  render();
+  // 圆环绘制动画只在第一次出现时播放
+  setTimeout(() => document.getElementById('app').classList.remove('intro'), 1000);
 }
 
 async function doSwitch(uuid) {
   confirming = null;
+  renderSheet();
   const r = await fetch('api/switch', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({uuid})});
   error = r.ok ? '' : '切换失败：' + (await r.text());
   load();
@@ -385,25 +420,28 @@ async function doSwitch(uuid) {
 
 document.addEventListener('click', e => {
   const act = e.target.closest('[data-act]')?.dataset.act;
-  const card = e.target.closest('.acc.clickable, .confirm');
   if (act === 'close') return window.hideDashboard();
   if (act === 'pin') { pinned = !pinned; window.pinDashboard(pinned); renderTools(); return; }
   if (act === 'refresh') return load();
-  if (act === 'cancel') { confirming = null; return render(); }
-  if (act === 'switch' && card) return doSwitch(card.dataset.uuid);
-  if (card) { confirming = card.dataset.uuid; render(); }
+  if (act === 'switch' && confirming) return doSwitch(confirming);
+  if (act === 'cancel' || e.target.id === 'sheet') { confirming = null; return renderSheet(); }
+  const row = e.target.closest('.row:not(.disabled)');
+  if (row) { confirming = row.dataset.uuid; renderSheet(); }
 });
 
 document.addEventListener('keydown', e => {
   if (e.key !== 'Escape') return;
-  if (confirming) { confirming = null; render(); }
+  if (confirming) { confirming = null; renderSheet(); }
   else if (NATIVE) window.hideDashboard();
 });
 
 renderTools();
+// 字体加载完或窗口尺寸变化后重新量一次高度，避免首次测量偏差
+document.fonts && document.fonts.ready.then(fit);
+window.addEventListener('resize', fit);
 load();
 setInterval(load, 15000);
-setInterval(render, 1000);
+setInterval(tick, 1000);
 </script>
 </body>
 </html>
