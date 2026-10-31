@@ -69,14 +69,23 @@
 
   /* ---- 其他账户：每个一行，按可用程度排序 ---- */
   .others { background: var(--card); border-radius: 14px; box-shadow: var(--shadow); overflow: hidden; }
-  .acc { display: grid; grid-template-columns: 26px 84px minmax(0, 1fr) 58px 108px; align-items: center; column-gap: 10px;
-         padding: 11px 16px; font-size: 15px; }
+  /* 第一行：头像 | 名字 | 5h | 周；第二行：状态 | 5h 重置 | 周重置；可选第三行：推荐理由 */
+  .acc { display: grid; grid-template-columns: 26px 96px minmax(0, 1fr) minmax(0, 1fr); align-items: center;
+         column-gap: 10px; row-gap: 2px; padding: 10px 16px; font-size: 15px; }
+  .acc .avatar { grid-row: 1 / 3; align-self: center; }
+  .acc.rec { background: var(--accent-soft); }
+  .acc.rec.clickable:hover { background: var(--accent-soft); filter: brightness(.98); }
+  .rtag { font-size: 11px; font-weight: 600; color: #fff; background: var(--accent); border-radius: 999px; padding: 0 7px; margin-left: 6px; vertical-align: 2px; }
+  .sub { font-size: 13px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+  .sub b { color: var(--warn); font-weight: 600; }
+  .why { grid-column: 2 / 5; font-size: 13px; color: var(--accent); margin-top: 2px; }
   .acc + .acc, .acc + .confirm, .confirm + .acc { border-top: 1px solid var(--line); }
   .acc.clickable { cursor: pointer; }
   .acc.clickable:hover { background: var(--card-hover); }
   .acc .avatar { width: 26px; height: 26px; font-size: 13px; }
   .acc .name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .mini { display: grid; grid-template-columns: 18px 1fr 44px; align-items: center; column-gap: 6px; }
+  .acc .status { text-align: left; font-size: 13px; }
+  .mini { display: grid; grid-template-columns: 18px 1fr 42px; align-items: center; column-gap: 6px; }
   .mini .lbl { color: var(--muted); font-size: 12px; }
   .mini .bar { height: 6px; }
   .mini .pct { text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
@@ -114,7 +123,7 @@
   <div id="banner"></div>
   <div class="list" id="grid"></div>
   <div class="alerts" id="alerts"></div>
-  <div class="foot"><span>点一行切换 · 悬停看邮箱和登录有效期</span><span id="updated"></span></div>
+  <div class="foot"><span>点一行切换 · 悬停看邮箱和登录有效期 · 竖线 = 窗口已过去的时间</span><span id="updated"></span></div>
 </div>
 
 <script>
@@ -171,7 +180,8 @@ function availability(a) {
   const blocked = [a.session, a.weekly].filter(w => w && w.pct >= state.threshold);
   if (!blocked.length) return {cls: 'ok', text: '可用 ✓', rank: 0, until: 0, peak: Math.max(a.session.pct, a.weekly ? a.weekly.pct : 0)};
   const until = Math.max(...blocked.map(w => w.reset ? new Date(w.reset).getTime() : Infinity));
-  return {cls: 'wait', text: until === Infinity ? '已用满' : absTime(new Date(until)) + ' 恢复', rank: 1, until};
+  // 恢复时间已写在下面对应窗口的小字里，这里只给结论
+  return {cls: 'wait', text: '已用满', rank: 1, until};
 }
 
 function pace(w, spanMs) {
@@ -261,13 +271,53 @@ function heroCard(a) {
       <span class="tag">当前</span><span class="fresh"><span class="dot ${f.cls}"></span>${f.text}</span></div>${body}</div>`;
 }
 
-function accRow(a) {
+// 每个窗口下面那行小字：重置时间；被用满的写"恢复"并标橙。
+function resetText(w) {
+  if (!w) return '';
+  if (!w.reset) return '未开始';
+  const t = absTime(new Date(w.reset));
+  return w.pct >= state.threshold ? `<b>${t} 恢复</b>` : `${t} 重置`;
+}
+
+// 推荐切到哪个号（只在当前账户用得较多时给出）：
+// 1) 周额度 2 天内重置、还剩 20% 以上没用的号，先用掉，否则作废；取最早重置的。
+// 2) 否则取 5h 剩余最多的；差不多时（15% 以内）选 5h 窗口最先重置的，用完很快又能满额。
+// 周用量已接近阈值的号不参与第 2 条。
+function recommend(active, list) {
+  const cur = active && active.session;
+  const busy = !active || !cur || cur.pct >= 50 || (active.weekly && active.weekly.pct >= state.threshold);
+  if (!busy) return null;
+  const ok = list.filter(a => availability(a).rank === 0);
+  if (!ok.length) return null;
+  const nowMs = now(), weekLeft = a => a.weekly && a.weekly.reset ? new Date(a.weekly.reset) - nowMs : Infinity;
+  const expiring = ok.filter(a => weekLeft(a) < 2 * 864e5 && 100 - a.weekly.pct >= 20)
+                     .sort((x, y) => weekLeft(x) - weekLeft(y));
+  if (expiring.length) {
+    const a = expiring[0];
+    return {uuid: a.uuid, why: `周额度 ${countdown(weekLeft(a))}后重置，还剩 ${Math.round(100 - a.weekly.pct)}% 没用，先用掉`};
+  }
+  const roomy = ok.filter(a => !a.weekly || a.weekly.pct < state.threshold - 10);
+  const pool = roomy.length ? roomy : ok;
+  const room = a => 100 - a.session.pct;
+  const resetIn = a => a.session.reset ? new Date(a.session.reset) - nowMs : SESSION_MS;
+  const best = Math.max(...pool.map(room));
+  const a = pool.filter(x => room(x) >= best - 15).sort((x, y) => resetIn(x) - resetIn(y))[0];
+  const when = a.session.reset ? `，${absTime(new Date(a.session.reset))} 就会重置` : '（窗口未开始）';
+  return {uuid: a.uuid, why: `5h 还剩 ${Math.round(room(a))}%${when}`};
+}
+
+function accRow(a, rec) {
   const [name, plan] = splitLabel(a.label), av = availability(a), can = !state.busy;
-  const s = a.session, w = a.weekly;
-  const mini = s ? `<div class="mini"><span class="lbl">5h</span><div class="bar">${bar(s)}${pace(s, SESSION_MS)}</div><span class="pct">${Math.round(s.pct)}%</span></div>` : '<span></span>';
-  const wk = w ? `<span class="wk"><span class="lbl">周</span>${Math.round(w.pct)}%</span>` : '<span></span>';
-  let html = `<div class="acc${can ? ' clickable' : ''}" data-uuid="${esc(a.uuid)}" title="${esc(hoverText(a, plan))}">
-    ${avatar(a, name)}<span class="name">${esc(name)}</span>${mini}${wk}<span class="status ${av.cls}">${av.text}</span></div>`;
+  const isRec = rec && rec.uuid === a.uuid;
+  const mini = (label, w, span) => w
+    ? `<div class="mini"><span class="lbl">${label}</span><div class="bar">${bar(w)}${pace(w, span)}</div><span class="pct">${Math.round(w.pct)}%</span></div>`
+    : '<span></span>';
+  let html = `<div class="acc${can ? ' clickable' : ''}${isRec ? ' rec' : ''}" data-uuid="${esc(a.uuid)}" title="${esc(hoverText(a, plan))}">
+    ${avatar(a, name)}<span class="name">${esc(name)}${isRec ? '<span class="rtag">推荐</span>' : ''}</span>
+    ${mini('5h', a.session, SESSION_MS)}${mini('周', a.weekly, WEEK_MS)}
+    <span class="status ${av.cls}">${av.text}</span>
+    <span class="sub">${a.session ? resetText(a.session) : ''}</span><span class="sub">${a.weekly ? resetText(a.weekly) : ''}</span>
+    ${isRec ? `<div class="why">↳ ${esc(rec.why)}</div>` : ''}</div>`;
   if (confirming === a.uuid && can) html += `<div class="confirm" data-uuid="${esc(a.uuid)}"><span>切换到 ${esc(name)}？Claude 会重启</span>
     <button class="btn" data-act="cancel">取消</button><button class="btn primary" data-act="switch">切换</button></div>`;
   return html;
@@ -293,8 +343,11 @@ function render() {
   const others = state.accounts.filter(a => a !== active).map(a => ({a, av: availability(a)}))
     .sort((x, y) => x.av.rank - y.av.rank || (x.av.rank === 0 ? x.av.peak - y.av.peak : x.av.until - y.av.until))
     .map(x => x.a);
+  // 推荐的号排到第一位
+  const rec = recommend(active, others);
+  if (rec) others.sort((x, y) => (y.uuid === rec.uuid) - (x.uuid === rec.uuid));
   grid.innerHTML = (active ? heroCard(active) : '') +
-    (others.length ? `<div class="others">${others.map(accRow).join('')}</div>` : '');
+    (others.length ? `<div class="others">${others.map(a => accRow(a, rec)).join('')}</div>` : '');
   const alerts = state.accounts.flatMap(a => alertsFor(a, splitLabel(a.label)[0]));
   document.getElementById('alerts').innerHTML = alerts.map(([cls, t]) => `<div class="alert ${cls}">⚠ ${esc(t)}</div>`).join('');
   fit();
