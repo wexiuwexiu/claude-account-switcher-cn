@@ -106,6 +106,7 @@
   .info .l2 b { color: var(--orange); font-weight: 600; }
   .info .l2 .k { display: inline-block; width: 34px; color: var(--label3); }
   .info .why { font-size: 14px; color: var(--blue); margin-top: 3px; }
+  .info .why.later { color: var(--orange); }
   .minis { display: flex; gap: 10px; }
   .mini { width: 46px; text-align: center; }
   .mini .ring { position: relative; width: 46px; height: 46px; }
@@ -226,27 +227,59 @@ function availability(a) {
   return {pill: 'orange', text: '已用满', rank: 1, until};
 }
 
-// 推荐切到哪个号（当前账户用到一半以上才给）：
-// 1) 周额度 2 天内重置、还剩 20% 以上没用的号，先用掉，否则作废；取最早重置的。
-// 2) 否则取 5h 剩余最多的；差不多时（15% 以内）选 5h 窗口最先重置的。周用量接近阈值的号不参与第 2 条。
-function recommend(active, list) {
-  const cur = active && active.session;
-  const busy = !active || !cur || cur.pct >= 50 || (active.weekly && active.weekly.pct >= state.threshold);
-  if (!busy) return null;
-  const ok = list.filter(a => availability(a).rank === 0);
-  if (!ok.length) return null;
-  const t = now(), weekLeft = a => a.weekly && a.weekly.reset ? new Date(a.weekly.reset) - t : Infinity;
-  const expiring = ok.filter(a => weekLeft(a) < 2 * 864e5 && 100 - a.weekly.pct >= 20).sort((x, y) => weekLeft(x) - weekLeft(y));
-  if (expiring.length) {
-    const a = expiring[0];
-    return {uuid: a.uuid, why: `周额度 ${countdown(weekLeft(a))}后重置，还剩 ${Math.round(100 - a.weekly.pct)}% 没用，先用掉`};
+// ---- 推荐：目标是把每个号的周额度尽量用光 ----
+// 周额度才是总预算，到期没用完就作废；5 小时额度只是限速。
+// 紧迫度 = 周额度剩余 % ÷ 距周重置的小时数，即"要按时用完，平均每小时得用多少"。越大越该先用。
+const HOUR = 3600e3;
+function urgency(a) {
+  if (!a || a.problem || !a.weekly) return 0;
+  const left = 100 - a.weekly.pct;
+  if (left <= 100 - state.threshold) return 0;              // 已到阈值，没有可用额度
+  const hours = a.weekly.reset ? Math.max((new Date(a.weekly.reset) - now()) / HOUR, 0.5) : WEEK_MS / HOUR;
+  return left / hours;
+}
+const urgText = u => u >= 1 ? u.toFixed(1) : u.toFixed(2);
+function urgWhy(a) {
+  const left = Math.round(100 - a.weekly.pct);
+  const when = a.weekly.reset ? `${countdown(new Date(a.weekly.reset) - now())}后重置` : '周窗口未开始';
+  return `周剩 ${left}%，${when}，每小时需用 ${urgText(urgency(a))}%`;
+}
+
+// 给出建议：
+// - rec：推荐切过去的号（现在就能用的号里紧迫度最高的）；当前账户本身更紧迫、且没被卡住时不推荐，避免无谓重启。
+//   别的号要比当前账户紧迫 50% 以上（且至少高 0.1%/时）才值得切。
+// - stay：继续用当前账户的理由（显示在当前账户卡片里）。
+// - later：5 小时窗口被用满、但周额度最紧迫的号，提示"恢复后优先用"。
+// 紧迫度都差不多（相差 10% 以内）时，优先 5 小时窗口已在计时、最先重置的号，重置时间接得上。
+function advise(active, list) {
+  const out = {rec: null, stay: '', later: {}};
+  const usable = list.filter(a => availability(a).rank === 0);
+  const t = now(), resetIn = a => a.session && a.session.reset ? new Date(a.session.reset) - t : SESSION_MS;
+  const ranked = usable.map(a => ({a, u: urgency(a)})).sort((x, y) => y.u - x.u);
+  let best = ranked[0];
+  if (best) {
+    const close = ranked.filter(x => x.u >= best.u * 0.9).sort((x, y) => resetIn(x.a) - resetIn(y.a));
+    best = close[0];
   }
-  const roomy = ok.filter(a => !a.weekly || a.weekly.pct < state.threshold - 10);
-  const pool = roomy.length ? roomy : ok;
-  const room = a => 100 - a.session.pct, resetIn = a => a.session.reset ? new Date(a.session.reset) - t : SESSION_MS;
-  const best = Math.max(...pool.map(room));
-  const a = pool.filter(x => room(x) >= best - 15).sort((x, y) => resetIn(x) - resetIn(y))[0];
-  return {uuid: a.uuid, why: `5 小时额度还剩 ${Math.round(room(a))}%` + (a.session.reset ? `，${absTime(new Date(a.session.reset))} 就会重置` : '')};
+  const activeBlocked = active && availability(active).rank !== 0;
+  const cu = active && !activeBlocked ? urgency(active) : 0;
+  if (best && (!active || activeBlocked || (best.u > cu * 1.5 && best.u - cu >= 0.1))) {
+    out.rec = {uuid: best.a.uuid, why: urgWhy(best.a)};
+  } else if (active && !activeBlocked && cu > 0 && list.length) {
+    out.stay = !best || cu >= best.u
+      ? `继续用当前账户：周额度最紧迫，平均每小时要用 ${urgText(cu)}%`
+      : `继续用当前账户：其他账户没有明显更紧迫，不值得重启切换`;
+  }
+  // 被 5 小时卡住、但比推荐的号更紧迫的号：恢复后优先用
+  const top = out.rec ? best.u : cu;
+  for (const a of list) {
+    const av = availability(a);
+    if (av.rank !== 1 || !a.session || a.session.pct < state.threshold) continue;   // 只看被 5 小时卡住的
+    if (a.weekly && a.weekly.pct >= state.threshold) continue;                      // 周额度也满了，没得用
+    const u = urgency(a);
+    if (u > top * 1.2 && u >= 0.1) out.later[a.uuid] = `恢复后先用它：${urgWhy(a)}`;
+  }
+  return out;
 }
 
 // 数据新旧：绿=新，橙=过期，红=查询失败
@@ -317,7 +350,7 @@ function whenText(w, withCountdown) {
   return withCountdown ? `${main} · 还剩 ${cd(w.reset)}` : main;
 }
 
-function heroCard(a) {
+function heroCard(a, adv) {
   const [name, plan] = splitLabel(a.label), f = freshDot(a);
   const head = `<div class="who"><span class="name">${esc(name)}</span><span class="pill blue">当前</span>
     ${plan ? `<span class="pill gray">${esc(plan)}</span>` : ''}<span class="fresh"><span class="dot ${f.cls}"></span>${f.text}</span></div>
@@ -332,7 +365,7 @@ function heroCard(a) {
   return `<div class="group" title="${esc(hoverText(a, plan))}"><div class="hero">
     <div class="rings"><svg viewBox="0 0 100 100">${ring(43, 11, s.pct, cs)}${ring(29.5, 11, w.pct, cw)}</svg>
       <div class="center"><b class="num">${Math.round(s.pct)}%</b><span>5 小时</span></div></div>
-    <div>${head}${stat('5 小时', cs, s, forecast(s))}${a.weekly ? stat('本周', cw, a.weekly) : ''}</div></div></div>`;
+    <div>${head}${stat('5 小时', cs, s, forecast(s))}${a.weekly ? stat('本周', cw, a.weekly, adv.stay ? `<div class="eta ok">${esc(adv.stay)}</div>` : '') : ''}</div></div></div>`;
 }
 
 function miniRing(label, w, base) {
@@ -342,7 +375,8 @@ function miniRing(label, w, base) {
     <span class="pct num">${Math.round(w.pct)}</span></div><div class="lab">${label}</div></div>`;
 }
 
-function accRow(a, rec) {
+function accRow(a, adv) {
+  const rec = adv.rec, later = adv.later[a.uuid];
   const [name, plan] = splitLabel(a.label), av = availability(a), isRec = rec && rec.uuid === a.uuid;
   const can = !state.busy;
   const pill = isRec ? '<span class="pill blue">推荐</span>' : `<span class="pill ${av.pill}">${av.text}</span>`;
@@ -353,7 +387,7 @@ function accRow(a, rec) {
   return `<div class="row${isRec ? ' rec' : ''}${can ? '' : ' disabled'}" data-uuid="${esc(a.uuid)}" title="${esc(hoverText(a, plan))}">
     ${avatar(a, name)}
     <div class="info"><div class="l1"><span class="nm">${esc(name)}</span>${pill}${mixedPlans() && plan ? `<span class="pill gray">${esc(plan)}</span>` : ''}<span class="mail">${esc(a.email || '')}</span></div>
-      <div class="l2">${l2}</div>${isRec ? `<div class="why">${esc(rec.why)}</div>` : ''}</div>
+      <div class="l2">${l2}</div>${isRec ? `<div class="why">${esc(rec.why)}</div>` : later ? `<div class="why later">${esc(later)}</div>` : ''}</div>
     <div class="minis">${miniRing('5 时', a.session, 'session')}${miniRing('本周', a.weekly, 'week')}</div>
     <span class="chev">${ICON.chev}</span></div>`;
 }
@@ -392,16 +426,16 @@ function render() {
     renderSheet(); fit(); return;
   }
   const active = state.accounts.find(a => a.active);
-  // 其他账户：可用的在前（用得少的更前），再按恢复时间，最后是无法使用的；推荐的排第一
-  const others = state.accounts.filter(a => a !== active).map(a => ({a, av: availability(a)}))
-    .sort((x, y) => x.av.rank - y.av.rank || (x.av.rank === 0 ? x.av.peak - y.av.peak : x.av.until - y.av.until)).map(x => x.a);
-  const rec = recommend(active, others);
-  if (rec) others.sort((x, y) => (y.uuid === rec.uuid) - (x.uuid === rec.uuid));
+  // 其他账户：能用的在前（周额度越紧迫越前），再按恢复时间，最后是无法使用的；推荐的排第一
+  const others = state.accounts.filter(a => a !== active).map(a => ({a, av: availability(a), u: urgency(a)}))
+    .sort((x, y) => x.av.rank - y.av.rank || (x.av.rank === 0 ? y.u - x.u : x.av.until - y.av.until)).map(x => x.a);
+  const adv = advise(active, others);
+  if (adv.rec) others.sort((x, y) => (y.uuid === adv.rec.uuid) - (x.uuid === adv.rec.uuid));
   const alerts = state.accounts.flatMap(a => alertsFor(a, splitLabel(a.label)[0]));
 
   let html = '';
-  if (active) html += `<div class="caption">当前账户</div>${heroCard(active)}`;
-  if (others.length) html += `<div class="caption">${active ? '切换到' : '账户'}</div><div class="group">${others.map(a => accRow(a, rec)).join('')}</div>`;
+  if (active) html += `<div class="caption">当前账户</div>${heroCard(active, adv)}`;
+  if (others.length) html += `<div class="caption">${active ? '切换到' : '账户'}</div><div class="group">${others.map(a => accRow(a, adv)).join('')}</div>`;
   if (alerts.length) html += `<div class="caption">需要注意</div><div class="group">${alerts.map(([cls, n, t]) =>
     `<div class="alert ${cls}"><span class="ic">!</span><div class="tx">${esc(n)}<br><span>${esc(t)}</span></div></div>`).join('')}</div>`;
   main.innerHTML = html;
