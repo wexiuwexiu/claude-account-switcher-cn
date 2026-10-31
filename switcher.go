@@ -254,6 +254,10 @@ func (s *switcher) check(ctx context.Context) (string, func() error) {
 			s.errs[j.uuid] = usageErrText(err, s.backoff[j.uuid])
 		}
 		a := s.account(j.uuid)
+		if j.new && err != nil && limited == nil {
+			// 新账户识别失败以前不留痕迹，这里记下原因便于排查。
+			log.Printf("new sign-in %s not added yet: %v", j.uuid[:8], err)
+		}
 		if j.new && err == nil {
 			a = &Account{UUID: j.uuid, Org: p.Organization.UUID, Name: p.Account.DisplayName, Email: p.Account.Email, Plan: p.plan()}
 			s.st.Accounts = append(s.st.Accounts, a)
@@ -282,6 +286,14 @@ func (s *switcher) check(ctx context.Context) (string, func() error) {
 		s.addingAt = time.Time{}
 	} else if adding && time.Since(s.addingAt) > 15*time.Minute {
 		s.addingAt, s.status = time.Time{}, ""
+	} else if adding && active == "" {
+		if id := s.app().pendingAccount(); id != "" && s.account(id) == nil {
+			msg := "New account signed in. Open the Code tab in Claude and send a message to finish"
+			if s.status != msg {
+				log.Printf("new sign-in %s has no Claude Code token yet; waiting for the Code tab", id[:8])
+				s.status = msg
+			}
+		}
 	}
 	s.saveState()
 	target, cause := s.autoTarget(desktopRunning(), lastChat, time.Now())

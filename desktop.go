@@ -52,6 +52,24 @@ func (d desktop) activeAccount() (string, error) {
 	return id, nil
 }
 
+// pendingAccount 返回"网页已登录、但还没有 Claude Code 授权 token"的账户 UUID。
+// 新账户在 Claude 里只登录网页时，config.json 有 lastKnownAccountUuid 却没有
+// oauth:tokenCacheV2；要打开 Code 标签页完成授权后才会生成，switcher 才能识别它。
+func (d desktop) pendingAccount() string {
+	cfg, err := readObject(d.configPath())
+	if err != nil {
+		return ""
+	}
+	if _, ok := cfg.get("oauth:tokenCacheV2"); ok {
+		return ""
+	}
+	var id string
+	if raw, ok := cfg.get("lastKnownAccountUuid"); ok {
+		_ = json.Unmarshal(raw, &id)
+	}
+	return id
+}
+
 // tokenCache returns the encrypted oauth:tokenCacheV2 value of a config file.
 func tokenCacheOf(configPath string) (string, error) {
 	cfg, err := readObject(configPath)
