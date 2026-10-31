@@ -99,6 +99,7 @@ type dashAccount struct {
 	Email     string      `json:"email"`
 	Active    bool        `json:"active"`
 	Problem   string      `json:"problem,omitempty"`
+	Pending   bool        `json:"pending,omitempty"` // 仅网页登录，见 Account.Pending
 	Session   *dashWindow `json:"session,omitempty"`
 	Weekly    *dashWindow `json:"weekly,omitempty"`
 	CheckedAt *time.Time  `json:"checkedAt,omitempty"`
@@ -133,7 +134,7 @@ func buildDashState(snap snapshot, now time.Time) dashState {
 		return w
 	}
 	for _, a := range snap.Accounts {
-		da := dashAccount{UUID: a.UUID, Label: a.label(), Email: a.Email, Active: a.UUID == snap.Active, Problem: a.Problem,
+		da := dashAccount{UUID: a.UUID, Label: a.label(), Email: a.Email, Active: a.UUID == snap.Active, Problem: a.Problem, Pending: a.Pending,
 			Error: snap.Errs[a.UUID], StaleAfter: int(idleFresh.Seconds())}
 		if da.Active {
 			da.StaleAfter = int(activeFresh.Seconds())
