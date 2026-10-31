@@ -26,6 +26,9 @@ type Account struct {
 	// Pending 表示只登录了网页、还没有 Claude Code token 的账户（例如尚未开通 Pro）：
 	// 可以切换，但读不到资料和用量；等 token 出现后自动补全并清除此标记。
 	Pending bool `json:"pending,omitempty"`
+	// LoginExpires 是保存的登录里最早到期的 token 时间（到期后靠 refreshToken 续期，
+	// 所以是"建议在此之前用一次"的时间，不是登录失效时间）。读不到时保留上次的值。
+	LoginExpires time.Time `json:"loginExpires,omitempty"`
 }
 
 func (a *Account) label() string {
@@ -305,6 +308,25 @@ func (s *switcher) check(ctx context.Context) (string, func() error) {
 		s.mu.Unlock()
 	}
 
+	// 登录有效期：解密开销小，每轮都更新，仪表盘据此提示临近过期的账户。
+	s.mu.Lock()
+	uuids := make([]string, 0, len(s.st.Accounts))
+	for _, a := range s.st.Accounts {
+		uuids = append(uuids, a.UUID)
+	}
+	s.mu.Unlock()
+	expiries := map[string]time.Time{}
+	for _, id := range uuids {
+		expiries[id] = s.loginExpiry(id, active)
+	}
+	s.mu.Lock()
+	for _, a := range s.st.Accounts {
+		if exp, ok := expiries[a.UUID]; ok && !exp.IsZero() {
+			a.LoginExpires = exp
+		}
+	}
+	s.mu.Unlock()
+
 	lastChat := lastChatWrite(s.app().sessionsDir())
 	s.mu.Lock()
 	adding := !s.addingAt.IsZero()
@@ -444,11 +466,34 @@ func (s *switcher) restart(change func(active string) error) error {
 }
 
 // saveActive keeps the signed-in account's latest login before it is replaced.
+// 覆盖前先把旧登录存入历史；当前登录的 token 比已保存的更早过期（或已没有 token）时
+// 不覆盖，避免用失效的登录顶掉还能用的那份。
 func (s *switcher) saveActive(active string) error {
 	if active == "" {
 		return nil
 	}
-	return saveProfile(s.app(), s.profileDir(active))
+	dir := s.profileDir(active)
+	now := time.Now()
+	cur := profileExpiry(s.app().configPath(), active)
+	saved := profileExpiry(filepath.Join(dir, "config.json"), active)
+	if saved.After(now) && cur.Before(saved) {
+		log.Printf("kept the saved sign-in of %s: it is valid until %s, the current one until %s",
+			active[:8], saved.Format("01-02 15:04"), cur.Format("01-02 15:04"))
+		return nil
+	}
+	if err := archiveProfile(s.app(), dir, now); err != nil {
+		return fmt.Errorf("archive sign-in: %w", err)
+	}
+	return saveProfile(s.app(), dir)
+}
+
+// loginExpiry 是账户保存的登录（当前账户则是 Claude 里的登录）的 token 过期时间。
+func (s *switcher) loginExpiry(uuid, active string) time.Time {
+	path := filepath.Join(s.profileDir(uuid), "config.json")
+	if uuid == active {
+		path = s.app().configPath()
+	}
+	return profileExpiry(path, uuid)
 }
 
 // switchTo signs the app in as uuid, for the reason in cause.

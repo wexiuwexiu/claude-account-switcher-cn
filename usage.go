@@ -171,3 +171,33 @@ func accessToken(cacheValue, account string) (string, error) {
 	}
 	return best, nil
 }
+
+// tokenExpiry 返回保存的登录里该账户最早到期的 token 时间。
+// 每个 token 都带 refreshToken：到期后 Claude 下次以该账户运行时会自动刷新，所以这不是
+// "登录失效"的时间，而是"最好在此之前用一次"的时间；refreshToken 本身的有效期无法得知。
+func tokenExpiry(cacheValue, account string) (time.Time, error) {
+	data, err := base64.StdEncoding.DecodeString(cacheValue)
+	if err != nil {
+		return time.Time{}, err
+	}
+	plain, err := decryptValue(data)
+	if err != nil {
+		return time.Time{}, err
+	}
+	var cache map[string]struct {
+		ExpiresAt int64 `json:"expiresAt"`
+	}
+	if err := json.Unmarshal(plain, &cache); err != nil {
+		return time.Time{}, err
+	}
+	var earliest int64
+	for k, v := range cache {
+		if strings.HasPrefix(k, "acct:"+account+"|") && v.ExpiresAt > 0 && (earliest == 0 || v.ExpiresAt < earliest) {
+			earliest = v.ExpiresAt
+		}
+	}
+	if earliest == 0 {
+		return time.Time{}, errSignedOut
+	}
+	return time.UnixMilli(earliest), nil
+}

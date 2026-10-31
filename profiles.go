@@ -39,6 +39,75 @@ func saveProfile(d desktop, dir string) error {
 	return nil
 }
 
+// 登录历史：每次覆盖账户的保存登录前，把旧的那份移到 history/<时间>/，保留最近 keepHistory 份。
+// 对邮箱无法找回的账户，这是登录失效时唯一的退路。
+const keepHistory = 5
+
+// profileFiles 是一份保存的登录包含的文件：config.json 和 Cookie 文件。
+func profileFiles(d desktop, dir string) []string {
+	files := []string{filepath.Join(dir, "config.json")}
+	for _, f := range d.cookieFiles() {
+		files = append(files, filepath.Join(dir, filepath.Base(f)))
+	}
+	return files
+}
+
+// archiveProfile 把 dir 里现有的登录复制到 dir/history/<时间>/。内容和最近一份历史相同则跳过。
+func archiveProfile(d desktop, dir string, now time.Time) error {
+	cur, err := os.ReadFile(filepath.Join(dir, "config.json"))
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil // 第一次保存，没有旧登录
+		}
+		return err
+	}
+	histRoot := filepath.Join(dir, "history")
+	names := historyNames(histRoot)
+	if len(names) > 0 {
+		last, err := os.ReadFile(filepath.Join(histRoot, names[len(names)-1], "config.json"))
+		if err == nil && string(last) == string(cur) {
+			return nil
+		}
+	}
+	dst := filepath.Join(histRoot, now.Format("20060102-150405"))
+	for _, f := range profileFiles(d, dir) {
+		if _, err := os.Stat(f); errors.Is(err, os.ErrNotExist) {
+			continue
+		}
+		if err := copyFile(f, filepath.Join(dst, filepath.Base(f))); err != nil {
+			return err
+		}
+	}
+	names = historyNames(histRoot)
+	for len(names) > keepHistory {
+		_ = os.RemoveAll(filepath.Join(histRoot, names[0]))
+		names = names[1:]
+	}
+	return nil
+}
+
+func historyNames(root string) []string {
+	entries, _ := os.ReadDir(root)
+	var names []string
+	for _, e := range entries {
+		if e.IsDir() {
+			names = append(names, e.Name())
+		}
+	}
+	sort.Strings(names)
+	return names
+}
+
+// profileExpiry 是 config.json 里该账户 token 的过期时间；没有 token 或读不出时为零值。
+func profileExpiry(configPath, account string) time.Time {
+	cache, err := tokenCacheOf(configPath)
+	if err != nil {
+		return time.Time{}
+	}
+	exp, _ := tokenExpiry(cache, account)
+	return exp
+}
+
 // restoreProfile puts a saved sign-in back. The app must be closed.
 func restoreProfile(d desktop, dir string) error {
 	saved, err := readObject(filepath.Join(dir, "config.json"))

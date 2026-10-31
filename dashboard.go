@@ -103,8 +103,10 @@ type dashAccount struct {
 	Weekly    *dashWindow `json:"weekly,omitempty"`
 	CheckedAt *time.Time  `json:"checkedAt,omitempty"`
 	// Error 是最近一次用量查询失败的原因；StaleAfter 秒后数据算过期（当前账户刷新更勤）。
-	Error      string `json:"error,omitempty"`
-	StaleAfter int    `json:"staleAfter"`
+	Error string `json:"error,omitempty"`
+	// LoginExpires 是保存的登录 token 过期时间，用于提醒长期不用的账户。
+	LoginExpires *time.Time `json:"loginExpires,omitempty"`
+	StaleAfter   int        `json:"staleAfter"`
 }
 
 type dashState struct {
@@ -135,6 +137,10 @@ func buildDashState(snap snapshot, now time.Time) dashState {
 			Error: snap.Errs[a.UUID], StaleAfter: int(idleFresh.Seconds())}
 		if da.Active {
 			da.StaleAfter = int(activeFresh.Seconds())
+		}
+		if !a.LoginExpires.IsZero() {
+			exp := a.LoginExpires
+			da.LoginExpires = &exp
 		}
 		if a.Usage != nil {
 			u := a.Usage.current(now)

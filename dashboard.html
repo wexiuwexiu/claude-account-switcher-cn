@@ -60,6 +60,7 @@
   .fresh { display: flex; align-items: center; gap: 5px; }
   .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
   .dot.stale { background: var(--warn); } .dot.err { background: var(--full); }
+  .login { font-size: 11px; } .login.stale { color: var(--warn); } .login.err { color: var(--full); }
   .go { opacity: 0; transform: translateX(-3px); color: var(--accent); font-weight: 600; transition: opacity .15s, transform .15s; }
 
   .row { display: grid; grid-template-columns: 22px 1fr 44px; align-items: center; column-gap: 10px; }
@@ -176,6 +177,19 @@ function freshness(a) {
   return {side: `<span class="fresh"><span class="dot ${cls}"></span>${text}</span>`, note};
 }
 
+// 登录 token：右侧小字"token 至 11-23"。到期后 Claude 以该账户运行时会用刷新令牌自动续期，
+// 所以这是"建议在此之前切过去用一次"的日期；剩 7 天内或已到期时在卡片底部提示。
+function login(a) {
+  if (!a.loginExpires) return {side: '', note: ''};
+  const at = new Date(a.loginExpires), left = at - now(), days = Math.floor(left / 864e5);
+  const d = `${pad(at.getMonth() + 1)}-${pad(at.getDate())}`;
+  const cls = left <= 0 ? 'err' : days < 7 ? 'stale' : '';
+  const side = `<span class="login ${cls}" title="最早到期的登录 token；到期后需要以该账户运行 Claude 才能用刷新令牌续期">token 至 ${d}</span>`;
+  const note = left <= 0 ? `<div class="note err">登录 token 已于 ${d} 到期：尽快切过去，让 Claude 用刷新令牌续期</div>`
+             : days < 7 ? `<div class="note stale">登录 token ${days} 天后到期：近期切过去用一下即可续期</div>` : '';
+  return {side, note};
+}
+
 // "wexiu (Pro)" -> 名字 wexiu + 标签 Pro
 function splitLabel(label) {
   const m = /^(.*) \((\w+)\)$/.exec(label);
@@ -204,11 +218,12 @@ function render() {
   grid.innerHTML = state.accounts.map((a, i) => {
     const can = !a.active && !state.busy;
     const [name, plan] = splitLabel(a.label);
-    const f = freshness(a);
+    const f = freshness(a), l = login(a);
     let body;
     if (a.problem) body = `<div class="problem">${esc(PROBLEM_ZH[a.problem] || a.problem)}</div>`;
     else if (!a.session) body = '<div class="note">用量未知</div>';
     else body = windowRow('5h', a.session, SESSION_MS) + windowRow('周', a.weekly, WEEK_MS) + f.note;
+    body += l.note;
     if (confirming === a.uuid && can) body += `<div class="confirm"><span>切换到 ${esc(name)}？Claude 会重启</span>
       <button class="btn" data-act="cancel">取消</button><button class="btn primary" data-act="switch">切换</button></div>`;
     return `<div class="card${a.active ? ' active' : ''}${can ? ' clickable' : ''}" data-uuid="${esc(a.uuid)}">
@@ -218,7 +233,7 @@ function render() {
           <div class="line1"><span class="name">${esc(name)}</span>${plan ? `<span class="plan">${esc(plan)}</span>` : ''}${a.active ? '<span class="tag">当前</span>' : ''}</div>
           <div class="email">${esc(a.email || '')}</div>
         </div>
-        <div class="side">${a.problem ? '' : f.side}${can && confirming !== a.uuid ? '<span class="go">切换 →</span>' : ''}</div>
+        <div class="side">${a.problem ? '' : f.side}${l.side}${can && confirming !== a.uuid ? '<span class="go">切换 →</span>' : ''}</div>
       </div>${body}</div>`;
   }).join('');
   fit();
