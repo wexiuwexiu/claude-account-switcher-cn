@@ -1,3 +1,39 @@
+> [!NOTE]
+> **这是 wexiu 的修改版**（分支 `wexiu`，版本 `0.3.5-wexiu.1`），基于 [SnlperStripes/claude-account-switcher](https://github.com/SnlperStripes/claude-account-switcher) v0.3.5。
+> 下文的原版说明、下载按钮和徽章都指向原项目；修改版目前需要自己编译，见下方「编译」。
+
+## 修改版改了什么
+
+**仪表盘（Windows 原生窗口）**
+- 左键点托盘图标弹出 / 收起仪表盘，右键仍是原菜单；Win11 浮出面板样式（圆角、阴影、深浅色跟随系统），停靠在屏幕右下角，不占任务栏。
+- 所有账户的 5 小时和周用量进度条、重置时间（带星期）、剩余时间、邮箱、套餐。
+- 按本窗口的使用速度预测 5 小时额度何时用完；按周额度剩余与重置时间推荐下一个该切的账户。
+- 显示每个账户数据的新鲜度和查询失败原因、保存的登录何时需要刷新。
+- 点账户切换前有确认面板，列出最近 1 小时内上下文 ≥ 15 万的对话（切号后续聊会在新账户里整段重写缓存）。
+- 可固定窗口（失焦不隐藏），高度随账户数自适应。WebView2 不可用时退回浏览器打开。
+
+**用量与切换**
+- 托盘菜单里每个账户都显示 5 小时和周的重置时间。
+- 「切号前提醒 /compact」（默认开启，菜单里可关）：5 小时额度快用满、确实要切号时，提醒先在旧账户里压缩大对话。
+- 支持添加只在网页登录过、还没授权 Claude Code 的账户（例如还没开通 Pro 时先录入）。
+
+**网络与其它**
+- 走 Windows 系统代理（读取注册表 Internet Settings，环境变量优先），解决国内网络下用量查询超时。
+- exe 自带多尺寸图标和版本信息。
+- 版本号带 `-wexiu.N` 后缀：官方出新版时菜单会提示，但点击只打开发布页，**不会自动覆盖**修改版。
+
+### 编译（Windows）
+
+```bash
+go test ./...
+go run github.com/tc-hib/go-winres@v0.3.3 make --arch amd64,arm64 --product-version 0.3.5.1 --file-version 0.3.5.1
+go build -ldflags "-H=windowsgui -s -w" -o claude-account-switcher.exe .
+```
+
+额外依赖：[`github.com/jchv/go-webview2`](https://github.com/jchv/go-webview2)（纯 Go，调用系统自带的 WebView2）。
+
+---
+
 <div align="center">
 
 <img src="assets/banner.svg" width="880" alt="Claude Account Switcher: switch the Claude desktop app between accounts. No email code, your chats come along.">
