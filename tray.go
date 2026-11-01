@@ -23,6 +23,7 @@ type tray struct {
 	auto       *systray.MenuItem
 	spend      *systray.MenuItem
 	compact    *systray.MenuItem
+	resume     *systray.MenuItem
 	warm       *systray.MenuItem
 	thresholds []*systray.MenuItem
 	add        *systray.MenuItem
@@ -94,6 +95,7 @@ func (t *tray) onReady() {
 	}
 	t.spend = t.checkbox("Auto-switch to use up expiring weekly", "Switch to an account whose weekly limit resets within a day with half or more of it unused", false)
 	t.compact = t.checkbox("Remind to /compact before switching", "When the 5-hour limit will run out soon, remind to compact large chats before switching accounts", false)
+	t.resume = t.checkbox("Continue interrupted chats after switching", "Ask which chats stopped by the switch should go on; off means none do, so large chats are not rewritten into the new account", false)
 	// 5 小时窗口预热，见 warmup.go；用各账户已保存的登录，不需要额外设置
 	t.warm = t.checkbox("Warm up 5-hour windows", "While you use Claude, keep the 5-hour window of the 2 most urgent accounts running with a tiny Haiku request (about 600 tokens)", false)
 	t.add = t.menu("Add account…", "Restart Claude on its sign-in screen, your current account is kept")
@@ -146,6 +148,8 @@ func (t *tray) onReady() {
 				t.s.setWarmup(!t.warm.Checked())
 			case <-t.compact.ClickedCh:
 				t.s.setCompactReminder(!t.compact.Checked())
+			case <-t.resume.ClickedCh:
+				t.s.setResumeChats(!t.resume.Checked())
 			case <-t.spend.ClickedCh:
 				t.s.setSpendWeekly(!t.spend.Checked())
 			case <-t.add.ClickedCh:
@@ -275,6 +279,7 @@ func (t *tray) render() {
 	setChecked(t.auto, snap.AutoSwitch)
 	setChecked(t.spend, snap.SpendWeekly)
 	setChecked(t.compact, snap.CompactReminder)
+	setChecked(t.resume, snap.ResumeChats)
 	setChecked(t.warm, snap.Warmup)
 	for i, item := range t.thresholds {
 		setChecked(item, thresholds[i] == snap.Threshold)

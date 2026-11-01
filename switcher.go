@@ -62,6 +62,9 @@ type State struct {
 	// The daily check for a new release is on unless this is set by hand.
 	// 切号前压缩提醒，默认开启；字段取反以便旧 state.json 默认为开。见 compact_remind.go。
 	NoCompactReminder bool `json:"noCompactReminder,omitempty"`
+	// ResumeChats：切号后是否让被打断的对话自动继续（默认关）。关时清掉中断标记，
+	// 免得大对话在新账号里自动续上、整段重写缓存；要继续的自己打开发一句即可。
+	ResumeChats bool `json:"resumeChats,omitempty"`
 	// 5 小时窗口预热（默认关）和每个账户的预热记录，见 warmup.go。
 	Warmup bool                `json:"warmup,omitempty"`
 	Warm   map[string]*warmRec `json:"warm,omitempty"`
@@ -486,6 +489,7 @@ func (s *switcher) restart(change func(active string) error) error {
 // askResume lets the user pick which of the chats the quit stopped mid-turn
 // the app continues on its start. Nobody answering means all of them, the
 // same as a restart without the switcher.
+// 改版：默认不弹窗、全部不继续（清掉中断标记），菜单开关打开后才弹窗选择。
 func (s *switcher) askResume(quitAt time.Time, running map[string]bool) {
 	uuid, err := s.app().activeAccount()
 	s.mu.Lock()
@@ -498,7 +502,13 @@ func (s *switcher) askResume(quitAt time.Time, running map[string]bool) {
 	if len(cut) == 0 {
 		return
 	}
-	keep := chooseResume(a.label(), cut, resumeWait)
+	s.mu.Lock()
+	ask := s.st.ResumeChats
+	s.mu.Unlock()
+	keep := make([]bool, len(cut)) // 开关关闭：全部不继续，不弹窗
+	if ask {
+		keep = chooseResume(a.label(), cut, resumeWait)
+	}
 	n := 0
 	for i, c := range cut {
 		if keep[i] {
@@ -676,6 +686,15 @@ func (s *switcher) setCompactReminder(on bool) {
 	s.onChange()
 }
 
+// setResumeChats 开关"切号后继续被打断的对话"（开时每次切号弹窗选择）。
+func (s *switcher) setResumeChats(on bool) {
+	s.mu.Lock()
+	s.st.ResumeChats = on
+	s.saveState()
+	s.mu.Unlock()
+	s.onChange()
+}
+
 // setLanguage 切换界面语言并保存，菜单和仪表盘随即刷新。
 func (s *switcher) setLanguage(l string) {
 	setLang(l)
@@ -702,10 +721,12 @@ type snapshot struct {
 	SpendWeekly bool
 	// CompactReminder 是否在快用满、要切号前提醒压缩大对话。
 	CompactReminder bool
-	Threshold       float64
-	Status          string
-	Note            string
-	Busy            bool
+	// ResumeChats 切号后是否弹窗让被打断的对话继续。
+	ResumeChats bool
+	Threshold   float64
+	Status      string
+	Note        string
+	Busy        bool
 	// Update is a version newer than this one, empty while there is none.
 	Update string
 	// Errs 是各账户最近一次用量查询失败的原因（键为 UUID）。
@@ -719,7 +740,7 @@ func (s *switcher) snapshot() snapshot {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	snap := snapshot{Active: s.active, AutoSwitch: s.st.AutoSwitch, SpendWeekly: s.st.SpendWeekly, Threshold: s.st.Threshold,
-		Status: s.status, Note: s.autoNote(time.Now()), Busy: s.busy.Load(), Errs: map[string]string{}, CompactReminder: !s.st.NoCompactReminder}
+		Status: s.status, Note: s.autoNote(time.Now()), Busy: s.busy.Load(), Errs: map[string]string{}, CompactReminder: !s.st.NoCompactReminder, ResumeChats: s.st.ResumeChats}
 	for k, v := range s.errs {
 		snap.Errs[k] = v
 	}
