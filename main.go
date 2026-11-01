@@ -17,9 +17,13 @@ import (
 )
 
 // 本地改版：后缀 -wexiu.N，官方更新只提示不自动安装（见 tray.go）。
-const version = "0.3.5-wexiu.2"
+const version = "0.3.6-wexiu.1"
 
 func main() {
+	// The dialog process started by askInDialogProcess.
+	if len(os.Args) == 2 && os.Args[1] == resumeFlag {
+		os.Exit(runResumeDialog())
+	}
 	status := flag.Bool("status", false, "print accounts and usage, then exit")
 	flag.Parse()
 

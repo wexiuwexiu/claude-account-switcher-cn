@@ -21,18 +21,13 @@ import (
 // WebView2 运行时缺失或创建失败时返回 false，调用方回退到浏览器。
 
 var (
-	user32                       = windows.NewLazySystemDLL("user32.dll")
 	procShowWindow               = user32.NewProc("ShowWindow")
 	procIsWindowVisible          = user32.NewProc("IsWindowVisible")
-	procSetForegroundWindow      = user32.NewProc("SetForegroundWindow")
-	procSetWindowPos             = user32.NewProc("SetWindowPos")
 	procSetWindowLongPtrW        = user32.NewProc("SetWindowLongPtrW")
 	procGetWindowLongPtrW        = user32.NewProc("GetWindowLongPtrW")
 	procCallWindowProcW          = user32.NewProc("CallWindowProcW")
 	procSendMessageW             = user32.NewProc("SendMessageW")
-	procGetDpiForWindow          = user32.NewProc("GetDpiForWindow")
 	procSystemParametersInfoW    = user32.NewProc("SystemParametersInfoW")
-	procCreateIconFromResourceEx = user32.NewProc("CreateIconFromResourceEx")
 	procSetThreadDpiAwarenessCtx = user32.NewProc("SetThreadDpiAwarenessContext")
 
 	dwmapi                           = windows.NewLazySystemDLL("dwmapi.dll")
@@ -47,7 +42,6 @@ const (
 	wmSetIcon        = 0x0080
 	gwlpWndProc      = ^uintptr(3)  // -4
 	gwlExStyle       = ^uintptr(19) // -20
-	gwlStyle         = ^uintptr(15) // -16
 	wsPopup          = 0x80000000
 	wsClipChildren   = 0x02000000
 	wsClipSiblings   = 0x04000000
