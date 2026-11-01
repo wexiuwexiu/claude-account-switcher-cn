@@ -34,7 +34,7 @@ type dashboard struct {
 func (d *dashboard) open() {
 	d.once.Do(d.start)
 	if d.err != nil {
-		d.s.setStatus("Dashboard: " + d.err.Error())
+		d.s.setStatus("仪表盘：" + d.err.Error())
 		return
 	}
 	if toggleNativeDashboard(d.url, d.s.dir, len(d.s.snapshot().Accounts)) {
@@ -232,7 +232,7 @@ func (d *dashboard) switchTo(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "busy", http.StatusConflict)
 		return
 	case body.UUID != snap.Active:
-		go d.s.run("Switch", func() error { return d.s.switchTo(body.UUID, byHand) })
+		go d.s.run("切换", func() error { return d.s.switchTo(body.UUID, byHand) })
 	}
 	w.WriteHeader(http.StatusAccepted)
 }

@@ -40,26 +40,26 @@ func (t *tray) onReady() {
 	t.status.Disable()
 	t.status.Hide()
 	// 改版不自动安装官方更新（会覆盖本地修改），点击只打开发布页。
-	t.update = systray.AddMenuItem("", "Open the release page; this modified build is not replaced")
+	t.update = systray.AddMenuItem("", "打开发布页；本改版不会被官方版本覆盖")
 	t.update.Hide()
 	for i := range t.accounts {
-		t.accounts[i] = systray.AddMenuItemCheckbox("", "Switch the Claude app to this account", false)
+		t.accounts[i] = systray.AddMenuItemCheckbox("", "把 Claude 切换到这个账户", false)
 		t.accounts[i].Hide()
 	}
 	systray.AddSeparator()
 	// 图形仪表盘：所有账户的 5h / 周用量进度条与重置倒计时，见 dashboard.go
-	dash := systray.AddMenuItem("Dashboard…", "Show usage of every account as charts in the browser")
-	t.auto = systray.AddMenuItemCheckbox("Auto-switch when nearly full", "Switch to the account with the most room left", false)
-	limit := systray.AddMenuItem("Auto-switch at", "")
+	dash := systray.AddMenuItem("仪表盘…", "图形显示所有账户的用量和重置时间（左键单击托盘图标也可打开）")
+	t.auto = systray.AddMenuItemCheckbox("快用满时自动切换", "当前账户达到阈值时，切到剩余额度最多的账户", false)
+	limit := systray.AddMenuItem("自动切换阈值", "")
 	for _, v := range thresholds {
 		t.thresholds = append(t.thresholds, limit.AddSubMenuItemCheckbox(fmt.Sprintf("%.0f%%", v), "", false))
 	}
-	t.spend = systray.AddMenuItemCheckbox("Auto-switch to use up expiring weekly", "Switch to an account whose weekly limit resets within a day with half or more of it unused", false)
-	t.compact = systray.AddMenuItemCheckbox("Remind to /compact before switching", "When the 5-hour limit will run out soon, remind to compact large chats before switching accounts", false)
+	t.spend = systray.AddMenuItemCheckbox("自动切换去用完快到期的周额度", "某账户的周额度一天内重置、且还剩一半以上时切过去，免得作废", false)
+	t.compact = systray.AddMenuItemCheckbox("切号前提醒 /compact", "5 小时额度快用满、要切号前，提醒先压缩大对话", false)
 	// 5 小时窗口预热，见 warmup.go；用各账户已保存的登录，不需要额外设置
-	t.warm = systray.AddMenuItemCheckbox("Warm up 5-hour windows", "While you use Claude, keep the 5-hour window of the 2 most urgent accounts running with a tiny Haiku request (about 600 tokens)", false)
-	t.add = systray.AddMenuItem("Add account…", "Restart Claude on its sign-in screen, your current account is kept")
-	t.importNow = systray.AddMenuItem("Import chats from all accounts", "Restart Claude so every chat shows up in this account")
+	t.warm = systray.AddMenuItemCheckbox("预热 5 小时窗口", "最近用过 Claude 时，用一条 Haiku 极简请求（约 600 token）让最紧迫的 2 个账户的 5 小时窗口一直在计时", false)
+	t.add = systray.AddMenuItem("添加账户…", "重启 Claude 到登录界面，当前账户会保留")
+	t.importNow = systray.AddMenuItem("导入所有账户的对话", "重启 Claude，让所有对话都出现在当前账户里")
 	systray.AddSeparator()
 	// Rewriting an enabled entry keeps its path current and adds the Task
 	// Manager record that entries from before v0.1.2 are missing.
@@ -68,16 +68,16 @@ func (t *tray) onReady() {
 			log.Printf("refresh start at login: %v", err)
 		}
 	}
-	t.autostart = systray.AddMenuItemCheckbox("Start at login", "", autostartEnabled())
-	folder := systray.AddMenuItem("Open data folder", "")
-	quit := systray.AddMenuItem("Quit", "")
+	t.autostart = systray.AddMenuItemCheckbox("开机启动", "", autostartEnabled())
+	folder := systray.AddMenuItem("打开数据文件夹", "")
+	quit := systray.AddMenuItem("退出", "")
 
 	for i, item := range t.accounts {
 		go func() {
 			for range item.ClickedCh {
 				snap := t.s.snapshot()
 				if i < len(snap.Accounts) && snap.Accounts[i].UUID != snap.Active {
-					go t.s.run("Switch", func() error { return t.s.switchTo(snap.Accounts[i].UUID, byHand) })
+					go t.s.run("切换", func() error { return t.s.switchTo(snap.Accounts[i].UUID, byHand) })
 				}
 				t.s.onChange()
 			}
@@ -107,12 +107,12 @@ func (t *tray) onReady() {
 			case <-t.spend.ClickedCh:
 				t.s.setSpendWeekly(!t.spend.Checked())
 			case <-t.add.ClickedCh:
-				go t.s.run("Add account", t.s.addAccount)
+				go t.s.run("添加账户", t.s.addAccount)
 			case <-t.importNow.ClickedCh:
-				go t.s.run("Import", t.s.importChats)
+				go t.s.run("导入对话", t.s.importChats)
 			case <-t.autostart.ClickedCh:
 				if err := setAutostart(!t.autostart.Checked()); err != nil {
-					t.s.setStatus("Start at login: " + err.Error())
+					t.s.setStatus("开机启动：" + err.Error())
 				}
 				setChecked(t.autostart, autostartEnabled())
 			case <-t.update.ClickedCh:
@@ -186,13 +186,13 @@ func (t *tray) render() {
 		t.status.Hide()
 	}
 	if snap.Update != "" {
-		t.update.SetTitle("Official version " + snap.Update + " is out (click for release notes)")
+		t.update.SetTitle("官方新版本 " + snap.Update + " 已发布（点击查看）")
 		t.update.Show()
 	} else {
 		t.update.Hide()
 	}
 	if len(snap.Accounts) == 0 && snap.Status == "" {
-		t.status.SetTitle("Open Claude and sign in")
+		t.status.SetTitle("请打开 Claude 并登录")
 		t.status.Show()
 	}
 
@@ -243,19 +243,29 @@ func (t *tray) render() {
 // starts a right-aligned column.
 var menuTab = map[bool]string{true: "\t", false: "    "}[runtime.GOOS == "windows"]
 
+// problemZH 把账户问题（Account.Problem 存英文原文）翻成菜单里的中文，与 dashboard.html 的 PROBLEM_ZH 一致。
+var problemZH = map[string]string{
+	"web sign-in only; usage shows after Pro + one use of the Code tab": "仅网页登录，开通 Pro 并用一次 Code 后显示用量",
+	"signed out, add it again": "登录已失效，请重新添加",
+}
+
+// usageText 是菜单和 -status 里账户后面的用量说明，例如 "5时 20% · 本周 40%，周四 12:00 重置"。
 func usageText(a Account, threshold float64, now time.Time) string {
 	if a.Problem != "" {
+		if zh, ok := problemZH[a.Problem]; ok {
+			return zh
+		}
 		return a.Problem
 	}
 	if a.Usage == nil {
-		return "usage unknown"
+		return "用量未知"
 	}
 	u := a.Usage.current(now)
-	// 5h 和 week 的重置时间都始终显示（只要 API 返回了未来的 resets_at）；
-	// 用量到阈值时写 "until"，表示要等到这个时间才能再用。
+	// 5 小时和周的重置时间都始终显示（只要 API 返回了未来的 resets_at）；
+	// 用量到阈值时写"恢复"，表示要等到这个时间才能再用。
 	parts := []string{
-		"5h " + windowText(u.Session, u.SessionReset, threshold, now),
-		"week " + windowText(u.Weekly, u.WeeklyReset, threshold, now),
+		"5时 " + windowText(u.Session, u.SessionReset, threshold, now),
+		"本周 " + windowText(u.Weekly, u.WeeklyReset, threshold, now),
 	}
 	return strings.Join(parts, " · ")
 }
@@ -267,23 +277,24 @@ func windowText(pct float64, reset time.Time, threshold float64, now time.Time) 
 	switch {
 	case reset.IsZero() || !reset.After(now):
 	case pct >= threshold:
-		s += " until " + resetText(reset, now)
+		s += "，" + resetText(reset, now) + " 恢复"
 	default:
-		s += ", resets " + resetText(reset, now)
+		s += "，" + resetText(reset, now) + " 重置"
 	}
 	return s
 }
 
+// resetText 写重置时间：今天只写时分，6 天内加周几，更远再加月日（只写周几会被误读成本周）。
 func resetText(at, now time.Time) string {
 	at, now = at.Local(), now.Local()
+	wd := "周" + []string{"日", "一", "二", "三", "四", "五", "六"}[at.Weekday()]
 	switch {
 	case at.YearDay() == now.YearDay() && at.Year() == now.Year():
 		return at.Format("15:04")
 	case at.Sub(now) < 6*24*time.Hour:
-		return at.Format("Mon 15:04")
+		return wd + " " + at.Format("15:04")
 	}
-	// A weekday alone would read as today for a reset a week out.
-	return at.Format("Mon 2 Jan 15:04")
+	return at.Format("01-02 ") + wd + " " + at.Format("15:04")
 }
 
 func (t *tray) setIcon(pct, threshold float64) {

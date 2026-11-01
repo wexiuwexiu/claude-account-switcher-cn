@@ -357,9 +357,9 @@ func (s *switcher) check(ctx context.Context) (string, func() error) {
 	switch {
 	case added && adding:
 		// A fresh sign-in: restart once so the chats of the other accounts show up.
-		return "Importing chats", s.importChats
+		return "导入对话", s.importChats
 	case target != nil:
-		return "Auto switch", func() error { return s.switchTo(target.UUID, cause) }
+		return "自动切换", func() error { return s.switchTo(target.UUID, cause) }
 	}
 	return "", nil
 }
@@ -425,7 +425,7 @@ func (s *switcher) run(what string, f func() error) {
 	err := f()
 	s.busy.Store(false)
 	if err != nil {
-		s.setStatus(fmt.Sprintf("%s failed: %v", what, err))
+		s.setStatus(fmt.Sprintf("%s失败：%v", what, err))
 		return
 	}
 	s.mu.Lock()
@@ -448,7 +448,7 @@ func (s *switcher) restart(change func(active string) error) error {
 	s.mu.Unlock()
 	defer func() {
 		if err := startDesktop(exe); err != nil {
-			s.setStatus("Could not start Claude: " + err.Error())
+			s.setStatus("无法启动 Claude：" + err.Error())
 		}
 	}()
 	bk, err := backup(s.app(), s.backupsDir())
@@ -520,7 +520,7 @@ func (s *switcher) switchTo(uuid string, cause switchCause) error {
 	if _, err := os.Stat(filepath.Join(s.profileDir(uuid), "config.json")); err != nil && uuid != s.snapshot().Active {
 		return fmt.Errorf("no saved sign-in for %s, use Add account", target.label())
 	}
-	s.setStatus("Switching to " + target.label() + "…")
+	s.setStatus("正在切换到 " + target.label() + "…")
 	err := s.restart(func(active string) error {
 		if active == uuid {
 			return nil
@@ -564,7 +564,7 @@ func (s *switcher) switchTo(uuid string, cause switchCause) error {
 
 // addAccount keeps the current sign-in and opens the app on its login screen.
 func (s *switcher) addAccount() error {
-	s.setStatus("Sign in with the other account in Claude")
+	s.setStatus("请在 Claude 中登录另一个账户")
 	err := s.restart(func(active string) error {
 		if err := s.saveActive(active); err != nil {
 			return err
@@ -581,7 +581,7 @@ func (s *switcher) addAccount() error {
 
 // importChats makes the chats of all accounts visible in the signed-in one.
 func (s *switcher) importChats() error {
-	s.setStatus("Importing chats…")
+	s.setStatus("正在导入对话…")
 	return s.restart(func(active string) error {
 		s.mu.Lock()
 		a := s.account(active)
@@ -696,13 +696,13 @@ func (s *switcher) autoNote(now time.Time) string {
 	at := resetText(s.st.LastSwitch, now)
 	switch s.st.LastCause {
 	case nearlyFull:
-		from := "the last account"
+		from := "上一个账户"
 		if a := s.account(s.st.LastFrom); a != nil {
 			from = a.label()
 		}
-		return fmt.Sprintf("Auto-switched at %s, %s was nearly full", at, from)
+		return fmt.Sprintf("%s 自动切换：%s 快用满了", at, from)
 	case spendWeekly:
-		return fmt.Sprintf("Auto-switched at %s to use up this account's week before it resets %s", at, resetText(s.st.SpendUntil, now))
+		return fmt.Sprintf("%s 自动切换：在 %s 重置前用完这个账户的周额度", at, resetText(s.st.SpendUntil, now))
 	}
 	return ""
 }

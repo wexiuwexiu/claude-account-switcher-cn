@@ -262,15 +262,15 @@ func TestSpendWeekly(t *testing.T) {
 func TestUsageTextShowsWeeklyReset(t *testing.T) {
 	now := time.Date(2026, 10, 6, 12, 0, 0, 0, time.Local)
 	a := Account{Usage: &Usage{Session: 20, Weekly: 40, WeeklyReset: now.Add(2 * 24 * time.Hour)}}
-	if got, want := usageText(a, 96, now), "5h 20% · week 40%, resets Thu 12:00"; got != want {
+	if got, want := usageText(a, 96, now), "5时 20% · 本周 40%，周四 12:00 重置"; got != want {
 		t.Fatalf("got %q, want %q", got, want)
 	}
 	a.Usage.Weekly = 97
-	if got, want := usageText(a, 96, now), "5h 20% · week 97% until Thu 12:00"; got != want {
+	if got, want := usageText(a, 96, now), "5时 20% · 本周 97%，周四 12:00 恢复"; got != want {
 		t.Fatalf("got %q, want %q", got, want)
 	}
 	a.Usage.Weekly, a.Usage.WeeklyReset = 0, now.Add(6*24*time.Hour+time.Hour)
-	if got, want := usageText(a, 96, now), "5h 20% · week 0%, resets Mon 12 Oct 13:00"; got != want {
+	if got, want := usageText(a, 96, now), "5时 20% · 本周 0%，10-12 周一 13:00 重置"; got != want {
 		t.Fatalf("got %q, want %q", got, want)
 	}
 }
@@ -279,16 +279,16 @@ func TestUsageTextShowsWeeklyReset(t *testing.T) {
 func TestUsageTextShowsSessionReset(t *testing.T) {
 	now := time.Date(2026, 10, 6, 12, 0, 0, 0, time.Local)
 	a := Account{Usage: &Usage{Session: 1, SessionReset: now.Add(3 * time.Hour), Weekly: 40}}
-	if got, want := usageText(a, 96, now), "5h 1%, resets 15:00 · week 40%"; got != want {
+	if got, want := usageText(a, 96, now), "5时 1%，15:00 重置 · 本周 40%"; got != want {
 		t.Fatalf("got %q, want %q", got, want)
 	}
 	a.Usage.Session = 100
-	if got, want := usageText(a, 96, now), "5h 100% until 15:00 · week 40%"; got != want {
+	if got, want := usageText(a, 96, now), "5时 100%，15:00 恢复 · 本周 40%"; got != want {
 		t.Fatalf("got %q, want %q", got, want)
 	}
 	// 重置时间已过：current() 把用量清零，不再显示过期时间。
 	a.Usage.SessionReset = now.Add(-time.Minute)
-	if got, want := usageText(a, 96, now), "5h 0% · week 40%"; got != want {
+	if got, want := usageText(a, 96, now), "5时 0% · 本周 40%"; got != want {
 		t.Fatalf("got %q, want %q", got, want)
 	}
 }
@@ -342,11 +342,11 @@ func TestAutoNote(t *testing.T) {
 		t.Fatalf("note after a switch by hand: %q", got)
 	}
 	s.st.LastCause, s.st.LastFrom = nearlyFull, "a"
-	if got, want := s.autoNote(now), "Auto-switched at 03:00, Pepe (Pro) was nearly full"; got != want {
+	if got, want := s.autoNote(now), "03:00 自动切换：Pepe (Pro) 快用满了"; got != want {
 		t.Fatalf("got %q, want %q", got, want)
 	}
 	s.st.LastCause, s.st.SpendUntil = spendWeekly, now.Add(9*time.Hour)
-	if got, want := s.autoNote(now), "Auto-switched at 03:00 to use up this account's week before it resets 18:00"; got != want {
+	if got, want := s.autoNote(now), "03:00 自动切换：在 18:00 重置前用完这个账户的周额度"; got != want {
 		t.Fatalf("got %q, want %q", got, want)
 	}
 	s.st.LastSwitch = now.Add(-noteFor - time.Minute)
