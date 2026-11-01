@@ -17,7 +17,7 @@ import (
 )
 
 // 本地改版：后缀 -wexiu.N，官方更新只提示不自动安装（见 tray.go）。
-const version = "0.3.5-wexiu.1"
+const version = "0.3.5-wexiu.2"
 
 func main() {
 	status := flag.Bool("status", false, "print accounts and usage, then exit")

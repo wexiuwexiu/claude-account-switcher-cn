@@ -108,6 +108,17 @@ type dashAccount struct {
 	// LoginExpires 是保存的登录 token 过期时间，用于提醒长期不用的账户。
 	LoginExpires *time.Time `json:"loginExpires,omitempty"`
 	StaleAfter   int        `json:"staleAfter"`
+	// Warm 是预热情况：只在开启预热或已保存 token 时给出。
+	Warm *dashWarm `json:"warm,omitempty"`
+}
+
+// dashWarm 是一个账户的预热状态，见 warmup.go。
+type dashWarm struct {
+	Token  bool       `json:"token"`
+	Last   *time.Time `json:"last,omitempty"`
+	Today  int        `json:"today"`
+	Tokens int        `json:"tokens,omitempty"`
+	Err    string     `json:"err,omitempty"`
 }
 
 type dashState struct {
@@ -116,6 +127,7 @@ type dashState struct {
 	Threshold  float64       `json:"threshold"`
 	WarnAt     float64       `json:"warnAt"`
 	AutoSwitch bool          `json:"autoSwitch"`
+	Warmup     bool          `json:"warmup"`
 	Busy       bool          `json:"busy"`
 	Status     string        `json:"status,omitempty"`
 	Note       string        `json:"note,omitempty"`
@@ -143,7 +155,7 @@ func bigChats(chats []chatInfo) []dashChat {
 // buildDashState 把 snapshot 转成页面用的 JSON；用量先经 current() 处理，
 // 已过重置时间的窗口归零，和菜单文字保持一致。
 func buildDashState(snap snapshot, now time.Time) dashState {
-	st := dashState{Now: now, Threshold: snap.Threshold, WarnAt: warnAt, AutoSwitch: snap.AutoSwitch,
+	st := dashState{Now: now, Threshold: snap.Threshold, WarnAt: warnAt, AutoSwitch: snap.AutoSwitch, Warmup: snap.Warmup,
 		Busy: snap.Busy, Status: snap.Status, Note: snap.Note, Accounts: []dashAccount{}}
 	window := func(pct float64, reset time.Time) *dashWindow {
 		w := &dashWindow{Pct: pct}
@@ -161,6 +173,14 @@ func buildDashState(snap snapshot, now time.Time) dashState {
 		if !a.LoginExpires.IsZero() {
 			exp := a.LoginExpires
 			da.LoginExpires = &exp
+		}
+		if r, ok := snap.Warm[a.UUID]; snap.WarmToken[a.UUID] || ok {
+			w := &dashWarm{Token: snap.WarmToken[a.UUID], Today: r.countOn(now.Local().Format("2006-01-02")), Tokens: r.Tokens, Err: r.Err}
+			if !r.Last.IsZero() {
+				last := r.Last
+				w.Last = &last
+			}
+			da.Warm = w
 		}
 		if a.Usage != nil {
 			u := a.Usage.current(now)

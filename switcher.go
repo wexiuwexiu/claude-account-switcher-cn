@@ -62,6 +62,9 @@ type State struct {
 	// The daily check for a new release is on unless this is set by hand.
 	// 切号前压缩提醒，默认开启；字段取反以便旧 state.json 默认为开。见 compact_remind.go。
 	NoCompactReminder bool `json:"noCompactReminder,omitempty"`
+	// 5 小时窗口预热（默认关）和每个账户的预热记录，见 warmup.go。
+	Warmup bool                `json:"warmup,omitempty"`
+	Warm   map[string]*warmRec `json:"warm,omitempty"`
 
 	NoUpdateCheck bool      `json:"noUpdateCheck,omitempty"`
 	UpdateChecked time.Time `json:"updateChecked,omitempty"`
@@ -656,6 +659,11 @@ type snapshot struct {
 	Update string
 	// Errs 是各账户最近一次用量查询失败的原因（键为 UUID）。
 	Errs map[string]string
+	// Warmup 是否开启预热；Warm 是各账户预热记录的副本（键为 UUID）。
+	Warmup bool
+	Warm   map[string]warmRec
+	// WarmToken 表示该账户已保存预热 token（键为 UUID）。
+	WarmToken map[string]bool
 }
 
 func (s *switcher) snapshot() snapshot {
@@ -666,11 +674,18 @@ func (s *switcher) snapshot() snapshot {
 	for k, v := range s.errs {
 		snap.Errs[k] = v
 	}
+	snap.Warmup, snap.Warm, snap.WarmToken = s.st.Warmup, map[string]warmRec{}, map[string]bool{}
+	for k, v := range s.st.Warm {
+		if v != nil {
+			snap.Warm[k] = *v
+		}
+	}
 	if !s.st.NoUpdateCheck && newerVersion(s.st.LatestVersion, version) {
 		snap.Update = s.st.LatestVersion
 	}
 	for _, a := range s.st.Accounts {
 		snap.Accounts = append(snap.Accounts, *a)
+		snap.WarmToken[a.UUID] = s.hasWarmToken(a.UUID)
 	}
 	return snap
 }

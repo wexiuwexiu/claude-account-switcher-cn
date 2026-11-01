@@ -309,7 +309,17 @@ function tokenInfo(a) {
 // 悬停提示：邮箱、套餐、登录 token、数据更新时间
 function hoverText(a, plan) {
   const t = tokenInfo(a);
-  return [a.email, plan && '套餐 ' + plan, t && `登录 token 至 ${t.date}`, '数据 ' + freshDot(a).text].filter(Boolean).join('\n');
+  return [a.email, plan && '套餐 ' + plan, t && `登录 token 至 ${t.date}`, '数据 ' + freshDot(a).text, warmText(a)].filter(Boolean).join('\n');
+}
+
+// 预热状态（悬停显示）：没 token 时提示怎么设置
+function warmText(a) {
+  const w = a.warm;
+  if (!w || !w.token) return state.warmup ? '预热：未设置 token' : '';
+  if (w.err) return '预热：已停用';
+  const last = w.last ? new Date(w.last) : null;
+  return '预热：已设置 token' + (last ? ` · 上次 ${pad(last.getHours())}:${pad(last.getMinutes())}` : '') +
+    (w.today ? ` · 今天 ${w.today} 次` : '') + (w.tokens ? ` · 每次约 ${w.tokens} token` : '');
 }
 
 // 只在出问题时出现：查询失败、数据过期、token 将到期 / 已到期
@@ -319,6 +329,7 @@ function alertsFor(a, name) {
   else if (f.stale && a.checkedAt && !a.problem) out.push(['stale', name, `用量数据 ${f.text}，可能已过期`]);
   if (t && t.left <= 0) out.push(['err', name, `登录 token 已于 ${t.date} 到期，尽快切过去让 Claude 续期`]);
   else if (t && t.days < 7) out.push(['stale', name, `登录 token ${t.days} 天后到期，近期切过去用一下即可续期`]);
+  if (a.warm && a.warm.err) out.push(['err', name, `${a.warm.err}。重新运行 claude setup-token 后在托盘菜单设置`]);
   return out;
 }
 
@@ -430,7 +441,8 @@ function renderSheet() {
 function render() {
   if (!state) return;
   document.getElementById('meta').innerHTML =
-    `阈值 ${state.threshold}% · 自动切换 <span class="${state.autoSwitch ? 'on' : ''}">${state.autoSwitch ? '开' : '关'}</span> · 更新于 ` +
+    `阈值 ${state.threshold}% · 自动切换 <span class="${state.autoSwitch ? 'on' : ''}">${state.autoSwitch ? '开' : '关'}</span>` +
+    ` · 预热 <span class="${state.warmup ? 'on' : ''}">${state.warmup ? '开' : '关'}</span> · 更新于 ` +
     new Date(state.now).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
   const toasts = [state.status, state.note].filter(Boolean).map(t => `<div class="toast"><i></i>${esc(t)}</div>`);
   if (state.busy) toasts.push('<div class="toast"><i></i>正在切换，Claude 会自动重启…</div>');
