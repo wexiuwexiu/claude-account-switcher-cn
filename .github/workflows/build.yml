@@ -12,6 +12,8 @@ permissions:
 jobs:
   build:
     strategy:
+      # macOS 构建失败时不取消 Windows 构建
+      fail-fast: false
       matrix:
         include:
           - os: windows-latest
@@ -35,7 +37,9 @@ jobs:
         shell: bash
         run: |
           v=$(sed -n 's/^const version = "\(.*\)"/\1/p' main.go)
-          go run github.com/tc-hib/go-winres@v0.3.3 make --arch amd64 --product-version "$v.0" --file-version "$v.0"
+          # Windows 文件版本只能是 4 段数字：0.3.5-wexiu.1 -> 0.3.5.1，0.3.5 -> 0.3.5.0
+          case "$v" in *-wexiu.*) n="${v%%-wexiu.*}.${v##*-wexiu.}" ;; *) n="$v.0" ;; esac
+          go run github.com/tc-hib/go-winres@v0.3.3 make --arch amd64 --product-version "$n" --file-version "$n"
       - name: Build
         shell: bash
         run: |
