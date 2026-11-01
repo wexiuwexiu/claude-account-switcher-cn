@@ -2,10 +2,17 @@
 > **这是 wexiu 的修改版**（分支 `wexiu`，版本 `0.3.5-wexiu.1`），基于 [SnlperStripes/claude-account-switcher](https://github.com/SnlperStripes/claude-account-switcher) v0.3.5。
 > 下文的原版说明、下载按钮和徽章都指向原项目；修改版目前需要自己编译，见下方「编译」。
 
+<p align="center">
+  <img src="assets/dashboard-light.png" width="300" alt="仪表盘（浅色）">
+  <img src="assets/dashboard-dark.png" width="300" alt="仪表盘（深色）">
+  <img src="assets/dashboard-confirm.png" width="300" alt="切换确认与切换代价">
+</p>
+<p align="center"><sub>仪表盘浅色 / 深色 / 切换确认。截图用虚构账户生成：<code>python -I tools/screenshots/shoot.py</code></sub></p>
+
 ## 修改版改了什么
 
 **仪表盘（Windows 原生窗口）**
-- 左键点托盘图标弹出 / 收起仪表盘，右键仍是原菜单；Win11 浮出面板样式（圆角、阴影、深浅色跟随系统），停靠在屏幕右下角，不占任务栏。
+- 左键点托盘图标弹出 / 收起仪表盘，右键仍是原菜单；iOS 风格卡片与圆环（深浅色跟随系统），停靠在屏幕右下角，不占任务栏。
 - 所有账户的 5 小时和周用量进度条、重置时间（带星期）、剩余时间、邮箱、套餐。
 - 按本窗口的使用速度预测 5 小时额度何时用完；按周额度剩余与重置时间推荐下一个该切的账户。
 - 显示每个账户数据的新鲜度和查询失败原因、保存的登录何时需要刷新。
