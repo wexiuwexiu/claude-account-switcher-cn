@@ -26,6 +26,7 @@ var resumePage string
 const resumeFlag = "-resume-dialog"
 
 type resumeRequest struct {
+	Lang    string       `json:"lang,omitempty"` // 界面语言 zh / en，对话框据此选文案
 	Account string       `json:"account"`
 	Wait    int          `json:"wait"`
 	Chats   []resumeChat `json:"chats"`
@@ -40,7 +41,7 @@ type resumeChat struct {
 // answer per chat. After wait without an answer all of them go on. Without
 // a web view the platform's plain dialog asks instead.
 func chooseResume(account string, chats []cutChat, wait time.Duration) []bool {
-	req := resumeRequest{Account: account, Wait: int(wait / time.Second)}
+	req := resumeRequest{Lang: lang(), Account: account, Wait: int(wait / time.Second)}
 	titles := make([]string, len(chats))
 	for i, c := range chats {
 		req.Chats = append(req.Chats, resumeChat{Title: c.title, Folder: c.folder})
@@ -88,6 +89,7 @@ func runResumeDialog() int {
 		fmt.Fprintln(os.Stderr, "bad request:", err)
 		return 2
 	}
+	setLang(req.Lang)
 	page, err := resumeHTML(req)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)

@@ -34,7 +34,7 @@ type dashboard struct {
 func (d *dashboard) open() {
 	d.once.Do(d.start)
 	if d.err != nil {
-		d.s.setStatus("仪表盘：" + d.err.Error())
+		d.s.setStatus(tr("Dashboard: ") + d.err.Error())
 		return
 	}
 	if toggleNativeDashboard(d.url, d.s.dir, len(d.s.snapshot().Accounts)) {
@@ -127,6 +127,7 @@ type dashState struct {
 	WarnAt     float64       `json:"warnAt"`
 	AutoSwitch bool          `json:"autoSwitch"`
 	Warmup     bool          `json:"warmup"`
+	Lang       string        `json:"lang"` // 界面语言 zh / en，页面据此选文案
 	Busy       bool          `json:"busy"`
 	Status     string        `json:"status,omitempty"`
 	Note       string        `json:"note,omitempty"`
@@ -154,7 +155,7 @@ func bigChats(chats []chatInfo) []dashChat {
 // buildDashState 把 snapshot 转成页面用的 JSON；用量先经 current() 处理，
 // 已过重置时间的窗口归零，和菜单文字保持一致。
 func buildDashState(snap snapshot, now time.Time) dashState {
-	st := dashState{Now: now, Threshold: snap.Threshold, WarnAt: warnAt, AutoSwitch: snap.AutoSwitch, Warmup: snap.Warmup,
+	st := dashState{Now: now, Threshold: snap.Threshold, WarnAt: warnAt, AutoSwitch: snap.AutoSwitch, Warmup: snap.Warmup, Lang: lang(),
 		Busy: snap.Busy, Status: snap.Status, Note: snap.Note, Accounts: []dashAccount{}}
 	window := func(pct float64, reset time.Time) *dashWindow {
 		w := &dashWindow{Pct: pct}
@@ -176,7 +177,7 @@ func buildDashState(snap snapshot, now time.Time) dashState {
 		if r, ok := snap.Warm[a.UUID]; ok {
 			w := &dashWarm{Today: r.countOn(now.Local().Format("2006-01-02")), Tokens: r.Tokens}
 			if r.stopped(a) {
-				w.Err = r.Err
+				w.Err = trPrefix(r.Err, "warmup failed: ")
 			}
 			if !r.Last.IsZero() {
 				last := r.Last
@@ -232,7 +233,7 @@ func (d *dashboard) switchTo(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "busy", http.StatusConflict)
 		return
 	case body.UUID != snap.Active:
-		go d.s.run("切换", func() error { return d.s.switchTo(body.UUID, byHand) })
+		go d.s.run("Switch", func() error { return d.s.switchTo(body.UUID, byHand) })
 	}
 	w.WriteHeader(http.StatusAccepted)
 }

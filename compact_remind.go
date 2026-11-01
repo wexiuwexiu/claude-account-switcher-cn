@@ -52,11 +52,19 @@ func compactReminder(u Usage, threshold float64, chats []chatInfo, now time.Time
 		if i == 3 {
 			break
 		}
-		names = append(names, fmt.Sprintf("「%s」(%s)", shortTitle(c.Title), tokensText(c.Context)))
+		if lang() == langZH {
+			names = append(names, fmt.Sprintf("「%s」(%s)", shortTitle(c.Title), tokensText(c.Context)))
+		} else {
+			names = append(names, fmt.Sprintf("\"%s\" (%s)", shortTitle(c.Title), tokensText(c.Context)))
+		}
 	}
 	at := now.Add(toFull).Local().Format("15:04")
-	title = fmt.Sprintf("5 小时额度 %.0f%%，预计 %s 用满", s.Session, at)
-	body = fmt.Sprintf("准备切号前，先在 %s 里运行 /compact。切号后续聊要把整段上下文在新账号里重写。", strings.Join(names, "、"))
+	sep := ", "
+	if lang() == langZH {
+		sep = "、"
+	}
+	title = trf("5-hour usage %.0f%%, full around %s", s.Session, at)
+	body = trf("Before switching, run /compact in %s. Continuing a chat on another account rewrites its whole context there.", strings.Join(names, sep))
 	return title, body, true
 }
 

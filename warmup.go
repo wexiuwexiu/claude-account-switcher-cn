@@ -48,7 +48,7 @@ type warmRec struct {
 	Count  int       `json:"count,omitempty"`
 	Verify time.Time `json:"verify,omitempty"` // 等待确认的那次预热时间；确认后清零
 	Fails  int       `json:"fails,omitempty"`
-	// Err 不为空时该账户停止预热；ErrLogin 是出错时保存的登录到期时间，
+	// Err（英文，显示时经 tr 翻译）不为空时该账户停止预热；ErrLogin 是出错时保存的登录到期时间，
 	// 切到该账户后登录续期（到期时间变了）就自动恢复。
 	Err      string    `json:"err,omitempty"`
 	ErrLogin time.Time `json:"errLogin,omitempty"`
@@ -260,7 +260,7 @@ func (s *switcher) warmStep(ctx context.Context, now time.Time) {
 		r.Fails++
 		log.Printf("warmup %s: no 5-hour window after the request (%d/%d)", a.label(), r.Fails, warmMaxFails)
 		if r.Fails >= warmMaxFails {
-			r.Err, r.ErrLogin = "预热后 5 小时窗口没有开始计时", a.LoginExpires
+			r.Err, r.ErrLogin = "the 5-hour window did not start after the warmup", a.LoginExpires
 		}
 	}
 	accts := make([]Account, 0, len(s.st.Accounts))
@@ -311,7 +311,7 @@ func (s *switcher) warmStep(ctx context.Context, now time.Time) {
 		}
 		r.Fails++
 		if r.Fails >= warmMaxFails || strings.Contains(msg, "401") || strings.Contains(strings.ToLower(msg), "auth") {
-			r.Err = "预热失败：" + msg
+			r.Err = "warmup failed: " + msg
 			if a != nil {
 				r.ErrLogin = a.LoginExpires
 			}

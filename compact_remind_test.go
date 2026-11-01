@@ -11,6 +11,7 @@ import (
 
 // 逐条验证触发条件：用量、预计用满、离重置的时间、大对话。
 func TestCompactReminder(t *testing.T) {
+	withLang(t, langZH)
 	now := time.Date(2026, 11, 1, 12, 0, 0, 0, time.Local)
 	big := []chatInfo{{Title: "光学实验台重构", LastRequest: now.Add(-5 * time.Minute), Context: 452_000}}
 	// 窗口已过 2 小时、用了 88%，3 小时后重置：按速度约 11 分钟后到 96%

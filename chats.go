@@ -87,17 +87,17 @@ func recentChats(sessionsRoot, projectsRoot string, now time.Time, within time.D
 	}
 	var out []chatInfo
 	for cli, e := range latest {
-		tr := findTranscript(projectsRoot, cli)
-		if tr == "" {
+		path := findTranscript(projectsRoot, cli)
+		if path == "" {
 			continue
 		}
-		at, ctx, ok := lastRequest(tr)
+		at, ctx, ok := lastRequest(path)
 		if !ok || now.Sub(at) > within {
 			continue
 		}
 		title := e.Title
 		if title == "" {
-			title = "未命名对话"
+			title = tr("Untitled chat")
 		}
 		out = append(out, chatInfo{Title: title, LastRequest: at, Context: ctx})
 	}
@@ -175,10 +175,13 @@ func lastRequest(path string) (time.Time, int, bool) {
 	return best, bestCtx, !best.IsZero()
 }
 
-// tokensText 把 token 数写成"45.2万"这样的中文习惯格式。
+// tokensText 把 token 数写成"45.2万"（中文）或"452k"（英文）。
 func tokensText(n int) string {
-	if n >= 10_000 {
+	if lang() == langZH && n >= 10_000 {
 		return strconv.FormatFloat(float64(n)/10_000, 'f', 1, 64) + "万"
+	}
+	if lang() != langZH && n >= 1_000 {
+		return strconv.Itoa((n+500)/1000) + "k"
 	}
 	return strconv.Itoa(n)
 }

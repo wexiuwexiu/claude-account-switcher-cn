@@ -104,7 +104,7 @@
   .info .l1 .pill { flex: none; }
   .info .l2 { font-size: 14px; color: var(--label2); margin-top: 3px; line-height: 1.45; font-variant-numeric: tabular-nums; }
   .info .l2 b { color: var(--orange); font-weight: 600; }
-  .info .l2 .k { display: inline-block; width: 34px; color: var(--label3); }
+  .info .l2 .k { display: inline-block; min-width: 34px; margin-right: 6px; color: var(--label3); }
   .info .why { font-size: 14px; color: var(--blue); margin-top: 3px; }
   .info .why.later { color: var(--orange); }
   .minis { display: flex; gap: 10px; }
@@ -153,12 +153,12 @@
 <body>
 <div id="app" class="intro">
   <div class="header">
-    <div class="title"><h1>账户</h1><div class="meta" id="meta"></div></div>
+    <div class="title"><h1 id="h1">账户</h1><div class="meta" id="meta"></div></div>
     <div class="tools" id="tools"></div>
   </div>
   <div id="toasts"></div>
   <div id="main"></div>
-  <div class="foot">点按账户切换 · 悬停查看登录有效期</div>
+  <div class="foot" id="foot">点按账户切换 · 悬停查看登录有效期</div>
   <div class="sheet-wrap hide" id="sheet"></div>
 </div>
 
@@ -170,6 +170,9 @@ const SESSION_MS = 5 * 3600e3, WEEK_MS = 7 * 24 * 3600e3;
 const AVATAR = [['#5e9cff','#2f6bff'], ['#b18cff','#7a4dff'], ['#ff8fc0','#ff4f93'], ['#ffb066','#ff7a1a'],
                 ['#4fdc8a','#14b25e'], ['#5fd8ef','#11a8cc'], ['#ffd25e','#f2a900'], ['#a9b4c4','#738196']];
 const NATIVE = typeof window.hideDashboard === 'function';
+// 界面语言来自 api/state 的 lang（托盘菜单"语言 / Language"设置）；L(中文, English) 按语言取文案。
+let LANG = 'zh';
+const L = (zh, en) => LANG === 'en' ? en : zh;
 const PROBLEM_ZH = {
   'web sign-in only; usage shows after Pro + one use of the Code tab': '仅网页登录：开通 Pro 并在 Code 标签页用一次后显示用量',
   'signed out, add it again': '登录已失效，请重新添加',
@@ -198,23 +201,23 @@ function tone(pct, base) {
 // 时间始终带周几："今天 周六 23:40"、"明天 周日 02:10"、"周二 17:59"、"11-07 周六 03:00"
 function absTime(d) {
   const n = new Date(now()), hm = pad(d.getHours()) + ':' + pad(d.getMinutes());
-  const wd = '周' + '日一二三四五六'[d.getDay()];
+  const wd = L('周' + '日一二三四五六'[d.getDay()], ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d.getDay()]);
   const days = Math.round((new Date(d).setHours(0,0,0,0) - new Date(n).setHours(0,0,0,0)) / 864e5);
-  if (days === 0) return `今天 ${wd} ${hm}`;
-  if (days === 1) return `明天 ${wd} ${hm}`;
+  if (days === 0) return L(`今天 ${wd} ${hm}`, `today ${hm}`);
+  if (days === 1) return L(`明天 ${wd} ${hm}`, `tomorrow ${hm}`);
   if (days < 7) return `${wd} ${hm}`;
-  return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${wd} ${hm}`;
+  return L(`${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${wd} ${hm}`, `${wd} ${d.getDate()} ${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()]} ${hm}`);
 }
 
 function countdown(ms) {
-  if (ms <= 0) return '即将重置';
+  if (ms <= 0) return L('即将重置', 'resetting now');
   const m = Math.ceil(ms / 60e3), d = Math.floor(m / 1440), h = Math.floor(m % 1440 / 60), mm = m % 60;
-  if (d > 0) return `${d} 天 ${h} 小时`;
-  if (h > 0) return `${h} 小时 ${mm} 分`;
-  return `${mm} 分钟`;
+  if (d > 0) return L(`${d} 天 ${h} 小时`, `${d}d ${h}h`);
+  if (h > 0) return L(`${h} 小时 ${mm} 分`, `${h}h ${mm}m`);
+  return L(`${mm} 分钟`, `${mm} min`);
 }
 // token 数写成"45.2万"
-const tokens = n => n >= 1e4 ? (n / 1e4).toFixed(1) + '万' : String(n);
+const tokens = n => LANG === 'en' ? (n >= 1e3 ? Math.round(n / 1e3) + 'k' : String(n)) : n >= 1e4 ? (n / 1e4).toFixed(1) + '万' : String(n);
 
 // 倒计时占位：tick() 每秒按 data-until 刷新文字
 const cd = iso => `<span data-until="${iso}">${countdown(new Date(iso) - now())}</span>`;
@@ -229,12 +232,12 @@ function ring(r, width, pct, color) {
 
 // 账户能否立刻使用：任一窗口达到阈值就要等它重置（取较晚的那个）
 function availability(a) {
-  if (a.problem) return {pill: 'gray', text: a.pending ? '仅网页登录' : '需处理', rank: 3, until: Infinity};
-  if (!a.session) return {pill: 'gray', text: '用量未知', rank: 2, until: Infinity};
+  if (a.problem) return {pill: 'gray', text: a.pending ? L('仅网页登录', 'web only') : L('需处理', 'needs action'), rank: 3, until: Infinity};
+  if (!a.session) return {pill: 'gray', text: L('用量未知', 'usage unknown'), rank: 2, until: Infinity};
   const blocked = [a.session, a.weekly].filter(w => w && w.pct >= state.threshold);
-  if (!blocked.length) return {pill: 'green', text: '可用', rank: 0, until: 0, peak: Math.max(a.session.pct, a.weekly ? a.weekly.pct : 0)};
+  if (!blocked.length) return {pill: 'green', text: L('可用', 'available'), rank: 0, until: 0, peak: Math.max(a.session.pct, a.weekly ? a.weekly.pct : 0)};
   const until = Math.max(...blocked.map(w => w.reset ? new Date(w.reset).getTime() : Infinity));
-  return {pill: 'orange', text: '已用满', rank: 1, until};
+  return {pill: 'orange', text: L('已用满', 'full'), rank: 1, until};
 }
 
 // ---- 推荐：目标是把每个号的周额度尽量用光 ----
@@ -251,8 +254,8 @@ function urgency(a) {
 const urgText = u => u >= 1 ? u.toFixed(1) : u.toFixed(2);
 function urgWhy(a) {
   const left = Math.round(100 - a.weekly.pct);
-  const when = a.weekly.reset ? `${countdown(new Date(a.weekly.reset) - now())}后重置` : '周窗口未开始';
-  return `周剩 ${left}%，${when}，每小时需用 ${urgText(urgency(a))}%`;
+  const when = a.weekly.reset ? L(`${countdown(new Date(a.weekly.reset) - now())}后重置`, `resets in ${countdown(new Date(a.weekly.reset) - now())}`) : L('周窗口未开始', 'week not started');
+  return L(`周剩 ${left}%，${when}，每小时需用 ${urgText(urgency(a))}%`, `${left}% of week left, ${when}, needs ${urgText(urgency(a))}%/h`);
 }
 
 // 给出建议：
@@ -277,8 +280,8 @@ function advise(active, list) {
     out.rec = {uuid: best.a.uuid, why: urgWhy(best.a)};
   } else if (active && !activeBlocked && cu > 0 && list.length) {
     out.stay = !best || cu >= best.u
-      ? `继续用当前账户：周额度最紧迫，平均每小时要用 ${urgText(cu)}%`
-      : `继续用当前账户：其他账户没有明显更紧迫，不值得重启切换`;
+      ? L(`继续用当前账户：周额度最紧迫，平均每小时要用 ${urgText(cu)}%`, `Stay on this account: its week is the most urgent, ${urgText(cu)}%/h needed`)
+      : L(`继续用当前账户：其他账户没有明显更紧迫，不值得重启切换`, `Stay on this account: no other one is urgent enough to restart for`);
   }
   // 被 5 小时卡住、但比推荐的号更紧迫的号：恢复后优先用
   const top = out.rec ? best.u : cu;
@@ -287,7 +290,7 @@ function advise(active, list) {
     if (av.rank !== 1 || !a.session || a.session.pct < state.threshold) continue;   // 只看被 5 小时卡住的
     if (a.weekly && a.weekly.pct >= state.threshold) continue;                      // 周额度也满了，没得用
     const u = urgency(a);
-    if (u > top * 1.2 && u >= 0.1) out.later[a.uuid] = `恢复后先用它：${urgWhy(a)}`;
+    if (u > top * 1.2 && u >= 0.1) out.later[a.uuid] = L(`恢复后先用它：${urgWhy(a)}`, `Use it first once it is back: ${urgWhy(a)}`);
   }
   return out;
 }
@@ -297,7 +300,7 @@ function freshDot(a) {
   const ago = a.checkedAt ? Math.max(0, Math.floor((now() - new Date(a.checkedAt)) / 60e3)) : null;
   const stale = ago === null || ago * 60 > a.staleAfter;
   return {cls: a.error ? 'err' : stale ? 'stale' : '', stale,
-          text: ago === null ? '未更新' : ago < 1 ? '刚刚' : ago < 60 ? `${ago} 分钟前` : `${Math.floor(ago / 60)} 小时前`};
+          text: ago === null ? L('未更新', 'not checked') : ago < 1 ? L('刚刚', 'just now') : ago < 60 ? L(`${ago} 分钟前`, `${ago} min ago`) : L(`${Math.floor(ago / 60)} 小时前`, `${Math.floor(ago / 60)} h ago`)};
 }
 
 function tokenInfo(a) {
@@ -309,27 +312,27 @@ function tokenInfo(a) {
 // 悬停提示：邮箱、套餐、登录 token、数据更新时间
 function hoverText(a, plan) {
   const t = tokenInfo(a);
-  return [a.email, plan && '套餐 ' + plan, t && `登录 token 至 ${t.date}`, '数据 ' + freshDot(a).text, warmText(a)].filter(Boolean).join('\n');
+  return [a.email, plan && L('套餐 ', 'Plan ') + plan, t && L(`登录 token 至 ${t.date}`, `Sign-in token until ${t.date}`), L('数据 ', 'Data ') + freshDot(a).text, warmText(a)].filter(Boolean).join('\n');
 }
 
 // 预热状态（悬停显示）
 function warmText(a) {
   const w = a.warm;
   if (!w) return '';
-  if (w.err) return '预热：已停用';
+  if (w.err) return L('预热：已停用', 'Warmup: stopped');
   const last = w.last ? new Date(w.last) : null;
-  return '预热' + (last ? `：上次 ${pad(last.getHours())}:${pad(last.getMinutes())}` : '') +
-    (w.today ? ` · 今天 ${w.today} 次` : '') + (w.tokens ? ` · 每次约 ${w.tokens} token` : '');
+  return L('预热', 'Warmup') + (last ? L(`：上次 ${pad(last.getHours())}:${pad(last.getMinutes())}`, `: last ${pad(last.getHours())}:${pad(last.getMinutes())}`) : '') +
+    (w.today ? L(` · 今天 ${w.today} 次`, ` · ${w.today} today`) : '') + (w.tokens ? L(` · 每次约 ${w.tokens} token`, ` · about ${w.tokens} tokens each`) : '');
 }
 
 // 只在出问题时出现：查询失败、数据过期、token 将到期 / 已到期
 function alertsFor(a, name) {
   const out = [], t = tokenInfo(a), f = freshDot(a);
-  if (a.error) out.push(['err', name, `查询失败（${a.error}）`]);
-  else if (f.stale && a.checkedAt && !a.problem) out.push(['stale', name, `用量数据 ${f.text}，可能已过期`]);
-  if (t && t.left <= 0) out.push(['err', name, `登录 token 已于 ${t.date} 到期，尽快切过去让 Claude 续期`]);
-  else if (t && t.days < 7) out.push(['stale', name, `登录 token ${t.days} 天后到期，近期切过去用一下即可续期`]);
-  if (a.warm && a.warm.err) out.push(['err', name, `预热已停用：${a.warm.err}。切到这个账户用一下 Claude、登录续期后自动恢复`]);
+  if (a.error) out.push(['err', name, L(`查询失败（${a.error}）`, `Check failed (${a.error})`)]);
+  else if (f.stale && a.checkedAt && !a.problem) out.push(['stale', name, L(`用量数据 ${f.text}，可能已过期`, `Usage from ${f.text}, may be out of date`)]);
+  if (t && t.left <= 0) out.push(['err', name, L(`登录 token 已于 ${t.date} 到期，尽快切过去让 Claude 续期`, `Sign-in token expired ${t.date}; switch to it soon so Claude renews it`)]);
+  else if (t && t.days < 7) out.push(['stale', name, L(`登录 token ${t.days} 天后到期，近期切过去用一下即可续期`, `Sign-in token expires in ${t.days} days; use this account once to renew it`)]);
+  if (a.warm && a.warm.err) out.push(['err', name, L(`预热已停用：${a.warm.err}。切到这个账户用一下 Claude、登录续期后自动恢复`, `Warmup stopped: ${a.warm.err}. It resumes once you use this account and its sign-in renews`)]);
   return out;
 }
 
@@ -351,12 +354,12 @@ function forecast(w) {
   if (elapsed < 15 * 60e3 || w.pct < 5) return '';
   const rate = w.pct / elapsed;                       // 每毫秒的百分比
   const toFull = (state.threshold - w.pct) / rate;    // 到阈值还需多久
-  if (toFull >= left) return `<div class="eta ok">按目前速度，重置前用不完</div>`;
+  if (toFull >= left) return `<div class="eta ok">${L('按目前速度，重置前用不完', 'At this pace it lasts until the reset')}</div>`;
   // 一定在 5 小时内，只写时分；提前量用短格式，保证一行放得下
   const at = new Date(now() + toFull), early = Math.round((left - toFull) / 60e3);
   const hm = pad(at.getHours()) + ':' + pad(at.getMinutes());
-  const short = early >= 60 ? `${Math.floor(early / 60)} 时 ${early % 60} 分` : `${early} 分`;
-  return `<div class="eta warn">按目前速度约 ${hm} 用满，比重置早 ${short}</div>`;
+  const short = early >= 60 ? L(`${Math.floor(early / 60)} 时 ${early % 60} 分`, `${Math.floor(early / 60)}h ${early % 60}m`) : L(`${early} 分`, `${early} min`);
+  return `<div class="eta warn">${L(`按目前速度约 ${hm} 用满，比重置早 ${short}`, `At this pace full around ${hm}, ${short} before the reset`)}</div>`;
 }
 
 // 账户套餐是否不全一样：一样就不在每行重复显示
@@ -365,19 +368,19 @@ const mixedPlans = () => new Set(state.accounts.map(a => splitLabel(a.label)[1])
 // 某个窗口的重置描述：被用满时写"恢复"并标橙
 function whenText(w, withCountdown) {
   if (!w) return '';
-  if (!w.reset) return '窗口未开始';
+  if (!w.reset) return L('窗口未开始', 'not started');
   const t = absTime(new Date(w.reset)), full = w.pct >= state.threshold;
-  const main = full ? `<b>${t} 恢复</b>` : `${t} 重置`;
-  return withCountdown ? `${main} · 还剩 ${cd(w.reset)}` : main;
+  const main = full ? `<b>${L(`${t} 恢复`, `back ${t}`)}</b>` : L(`${t} 重置`, `resets ${t}`);
+  return withCountdown ? `${main} · ${L('还剩', 'in')} ${cd(w.reset)}` : main;
 }
 
 function heroCard(a, adv) {
   const [name, plan] = splitLabel(a.label), f = freshDot(a);
-  const head = `<div class="who"><span class="name">${esc(name)}</span><span class="pill blue">当前</span>
+  const head = `<div class="who"><span class="name">${esc(name)}</span><span class="pill blue">${L('当前', 'current')}</span>
     ${plan ? `<span class="pill gray">${esc(plan)}</span>` : ''}<span class="fresh"><span class="dot ${f.cls}"></span>${f.text}</span></div>
     <div class="hmail">${esc(a.email || '')}</div>`;
   if (a.problem || !a.session) {
-    return `<div class="group" title="${esc(hoverText(a, plan))}"><div class="problem">${head}${esc(a.problem ? (PROBLEM_ZH[a.problem] || a.problem) : '用量未知')}</div></div>`;
+    return `<div class="group" title="${esc(hoverText(a, plan))}"><div class="problem">${head}${esc(a.problem ? problemText(a.problem) : L('用量未知', 'usage unknown'))}</div></div>`;
   }
   const s = a.session, w = a.weekly || {pct: 0};
   const cs = tone(s.pct, 'session'), cw = tone(w.pct, 'week');
@@ -385,8 +388,8 @@ function heroCard(a, adv) {
       <span class="val num">${Math.round(win.pct)}%</span></div><div class="when">${whenText(win, true)}</div>${extra || ''}</div>`;
   return `<div class="group" title="${esc(hoverText(a, plan))}"><div class="hero">
     <div class="rings"><svg viewBox="0 0 100 100">${ring(43, 11, s.pct, cs)}${ring(29.5, 11, w.pct, cw)}</svg>
-      <div class="center"><b class="num">${Math.round(s.pct)}%</b><span>5 小时</span></div></div>
-    <div>${head}${stat('5 小时', cs, s, forecast(s))}${a.weekly ? stat('本周', cw, a.weekly, adv.stay ? `<div class="eta ok">${esc(adv.stay)}</div>` : '') : ''}</div></div></div>`;
+      <div class="center"><b class="num">${Math.round(s.pct)}%</b><span>${L('5 小时', '5 hours')}</span></div></div>
+    <div>${head}${stat(L('5 小时', '5 hours'), cs, s, forecast(s))}${a.weekly ? stat(L('本周', 'Week'), cw, a.weekly, adv.stay ? `<div class="eta ok">${esc(adv.stay)}</div>` : '') : ''}</div></div></div>`;
 }
 
 function miniRing(label, w, base) {
@@ -400,24 +403,24 @@ function accRow(a, adv) {
   const rec = adv.rec, later = adv.later[a.uuid];
   const [name, plan] = splitLabel(a.label), av = availability(a), isRec = rec && rec.uuid === a.uuid;
   const can = !state.busy;
-  const pill = isRec ? '<span class="pill blue">推荐</span>' : `<span class="pill ${av.pill}">${av.text}</span>`;
+  const pill = isRec ? `<span class="pill blue">${L('推荐', 'suggested')}</span>` : `<span class="pill ${av.pill}">${av.text}</span>`;
   let l2;
-  if (a.problem) l2 = esc(PROBLEM_ZH[a.problem] || a.problem);
-  else if (!a.session) l2 = '用量未知';
-  else l2 = `<span class="k">5 时</span>${whenText(a.session)}<br><span class="k">本周</span>${whenText(a.weekly)}`;
+  if (a.problem) l2 = esc(problemText(a.problem));
+  else if (!a.session) l2 = L('用量未知', 'usage unknown');
+  else l2 = `<span class="k">${L('5 时', '5h')}</span>${whenText(a.session)}<br><span class="k">${L('本周', 'week')}</span>${whenText(a.weekly)}`;
   return `<div class="row${isRec ? ' rec' : ''}${can ? '' : ' disabled'}" data-uuid="${esc(a.uuid)}" title="${esc(hoverText(a, plan))}">
     ${avatar(a, name)}
     <div class="info"><div class="l1"><span class="nm">${esc(name)}</span>${pill}${mixedPlans() && plan ? `<span class="pill gray">${esc(plan)}</span>` : ''}<span class="mail">${esc(a.email || '')}</span></div>
       <div class="l2">${l2}</div>${isRec ? `<div class="why">${esc(rec.why)}</div>` : later ? `<div class="why later">${esc(later)}</div>` : ''}</div>
-    <div class="minis">${miniRing('5 时', a.session, 'session')}${miniRing('本周', a.weekly, 'week')}</div>
+    <div class="minis">${miniRing(L('5 时', '5h'), a.session, 'session')}${miniRing(L('本周', 'week'), a.weekly, 'week')}</div>
     <span class="chev">${ICON.chev}</span></div>`;
 }
 
 function renderTools() {
   const t = [];
-  if (NATIVE) t.push(`<button class="ibtn${pinned ? ' on' : ''}" data-act="pin" title="${pinned ? '取消固定' : '固定：点到别处不自动隐藏'}">${ICON.pin}</button>`);
-  t.push(`<button class="ibtn" data-act="refresh" title="刷新">${ICON.refresh}</button>`);
-  if (NATIVE) t.push(`<button class="ibtn" data-act="close" title="关闭 (Esc)">${ICON.close}</button>`);
+  if (NATIVE) t.push(`<button class="ibtn${pinned ? ' on' : ''}" data-act="pin" title="${pinned ? L('取消固定', 'Unpin') : L('固定：点到别处不自动隐藏', 'Pin: stay open when clicking elsewhere')}">${ICON.pin}</button>`);
+  t.push(`<button class="ibtn" data-act="refresh" title="${L('刷新', 'Refresh')}">${ICON.refresh}</button>`);
+  if (NATIVE) t.push(`<button class="ibtn" data-act="close" title="${L('关闭 (Esc)', 'Close (Esc)')}">${ICON.close}</button>`);
   document.getElementById('tools').innerHTML = t.join('');
 }
 
@@ -430,28 +433,35 @@ function renderSheet() {
   // 切换代价：最近 1 小时用过的大对话，切过去续聊要在新账号里整段重写
   const big = state.bigChats || [];
   const total = big.reduce((n, c) => n + c.context, 0);
-  const cost = big.length ? `<div class="cost"><b>⚠ 最近 1 小时有 ${big.length} 个大对话，合计 ${tokens(total)} token</b>
+  const cost = big.length ? `<div class="cost"><b>⚠ ${L(`最近 1 小时有 ${big.length} 个大对话，合计 ${tokens(total)} token`, `${big.length} large chat${big.length > 1 ? 's' : ''} in the last hour, ${tokens(total)} tokens in total`)}</b>
     ${big.slice(0, 3).map(c => `<div class="ci"><span>${esc(c.title)}</span><span class="num">${tokens(c.context)}</span></div>`).join('')}
-    ${big.length > 3 ? `<div class="ci more">还有 ${big.length - 3} 个</div>` : ''}
-    <div class="tip">切过去续聊会在新账号里全部重写；不急的话先在当前账号里 /compact，或只续聊其中一个</div></div>` : '';
-  el.innerHTML = `<div class="sheet"><div class="msg"><b>切换到 ${esc(name)}？</b>Claude 会重启，正在生成的回复会中断${cost}</div>
-    <button data-act="switch">切换</button></div><div class="sheet cancel"><button data-act="cancel">取消</button></div>`;
+    ${big.length > 3 ? `<div class="ci more">${L(`还有 ${big.length - 3} 个`, `${big.length - 3} more`)}</div>` : ''}
+    <div class="tip">${L('切过去续聊会在新账号里全部重写；不急的话先在当前账号里 /compact，或只续聊其中一个', 'Continuing them on the other account rewrites all of it there; if it can wait, /compact here first or continue just one')}</div></div>` : '';
+  el.innerHTML = `<div class="sheet"><div class="msg"><b>${L(`切换到 ${esc(name)}？`, `Switch to ${esc(name)}?`)}</b>${L('Claude 会重启，正在生成的回复会中断', 'Claude restarts; a reply being written stops')}${cost}</div>
+    <button data-act="switch">${L('切换', 'Switch')}</button></div><div class="sheet cancel"><button data-act="cancel">${L('取消', 'Cancel')}</button></div>`;
 }
+
+// 账户问题原文是英文，中文模式按 PROBLEM_ZH 翻译
+const problemText = p => LANG === 'en' ? p : (PROBLEM_ZH[p] || p);
+const CONN_ERR = () => L('连接失败，switcher 可能已退出', 'Cannot reach the switcher, it may have quit');
 
 function render() {
   if (!state) return;
+  document.documentElement.lang = L('zh-CN', 'en');
+  document.getElementById('h1').textContent = L('账户', 'Accounts');
+  document.getElementById('foot').textContent = L('点按账户切换 · 悬停查看登录有效期', 'Click an account to switch · hover for sign-in details');
   document.getElementById('meta').innerHTML =
-    `阈值 ${state.threshold}% · 自动切换 <span class="${state.autoSwitch ? 'on' : ''}">${state.autoSwitch ? '开' : '关'}</span>` +
-    ` · 预热 <span class="${state.warmup ? 'on' : ''}">${state.warmup ? '开' : '关'}</span> · 更新于 ` +
+    `${L('阈值', 'Threshold')} ${state.threshold}% · ${L('自动切换', 'Auto-switch')} <span class="${state.autoSwitch ? 'on' : ''}">${state.autoSwitch ? L('开', 'on') : L('关', 'off')}</span>` +
+    ` · ${L('预热', 'Warmup')} <span class="${state.warmup ? 'on' : ''}">${state.warmup ? L('开', 'on') : L('关', 'off')}</span> · ${L('更新于', 'updated')} ` +
     new Date(state.now).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
   const toasts = [state.status, state.note].filter(Boolean).map(t => `<div class="toast"><i></i>${esc(t)}</div>`);
-  if (state.busy) toasts.push('<div class="toast"><i></i>正在切换，Claude 会自动重启…</div>');
+  if (state.busy) toasts.push(`<div class="toast"><i></i>${L('正在切换，Claude 会自动重启…', 'Switching, Claude restarts by itself…')}</div>`);
   if (error) toasts.push(`<div class="toast err"><i></i>${esc(error)}</div>`);
   document.getElementById('toasts').innerHTML = toasts.join('');
 
   const main = document.getElementById('main');
   if (!state.accounts.length) {
-    main.innerHTML = '<div class="group"><div class="empty">还没有账户，请先在 Claude 中登录</div></div>';
+    main.innerHTML = `<div class="group"><div class="empty">${L('还没有账户，请先在 Claude 中登录', 'No accounts yet. Sign in to Claude first')}</div></div>`;
     renderSheet(); fit(); return;
   }
   const active = state.accounts.find(a => a.active);
@@ -463,9 +473,9 @@ function render() {
   const alerts = state.accounts.flatMap(a => alertsFor(a, splitLabel(a.label)[0]));
 
   let html = '';
-  if (active) html += `<div class="caption">当前账户</div>${heroCard(active, adv)}`;
-  if (others.length) html += `<div class="caption">${active ? '切换到' : '账户'}</div><div class="group">${others.map(a => accRow(a, adv)).join('')}</div>`;
-  if (alerts.length) html += `<div class="caption">需要注意</div><div class="group">${alerts.map(([cls, n, t]) =>
+  if (active) html += `<div class="caption">${L('当前账户', 'Current account')}</div>${heroCard(active, adv)}`;
+  if (others.length) html += `<div class="caption">${active ? L('切换到', 'Switch to') : L('账户', 'Accounts')}</div><div class="group">${others.map(a => accRow(a, adv)).join('')}</div>`;
+  if (alerts.length) html += `<div class="caption">${L('需要注意', 'Needs attention')}</div><div class="group">${alerts.map(([cls, n, t]) =>
     `<div class="alert ${cls}"><span class="ic">!</span><div class="tx">${esc(n)}<br><span>${esc(t)}</span></div></div>`).join('')}</div>`;
   main.innerHTML = html;
   renderSheet();
@@ -490,10 +500,11 @@ async function load() {
     const r = await fetch('api/state', {cache: 'no-store'});
     if (!r.ok) throw new Error(r.status);
     state = await r.json();
+    if (state.lang && state.lang !== LANG) { LANG = state.lang; renderTools(); }
     offset = new Date(state.now) - Date.now();
-    if (error.startsWith('连接失败')) error = '';
+    if (error === CONN_ERR()) error = '';
   } catch (e) {
-    error = '连接失败，switcher 可能已退出';
+    error = CONN_ERR();
   }
   render();
   // 圆环绘制动画只在第一次出现时播放
@@ -504,7 +515,7 @@ async function doSwitch(uuid) {
   confirming = null;
   renderSheet();
   const r = await fetch('api/switch', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({uuid})});
-  error = r.ok ? '' : '切换失败：' + (await r.text());
+  error = r.ok ? '' : L('切换失败：', 'Switch failed: ') + (await r.text());
   load();
 }
 

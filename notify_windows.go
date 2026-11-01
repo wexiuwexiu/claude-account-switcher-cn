@@ -17,8 +17,9 @@ const toastScript = `$ErrorActionPreference='Stop'
 [Windows.Data.Xml.Dom.XmlDocument, Windows.Data.Xml.Dom.XmlDocument, ContentType = WindowsRuntime] > $null
 $t = [Security.SecurityElement]::Escape($env:CAS_TOAST_TITLE)
 $b = [Security.SecurityElement]::Escape($env:CAS_TOAST_BODY)
+$o = [Security.SecurityElement]::Escape($env:CAS_TOAST_OK)
 $x = New-Object Windows.Data.Xml.Dom.XmlDocument
-$x.LoadXml("<toast scenario='reminder'><visual><binding template='ToastGeneric'><text>$t</text><text>$b</text></binding></visual><actions><action content='知道了' arguments='dismiss' activationType='system'/></actions></toast>")
+$x.LoadXml("<toast scenario='reminder'><visual><binding template='ToastGeneric'><text>$t</text><text>$b</text></binding></visual><actions><action content='$o' arguments='dismiss' activationType='system'/></actions></toast>")
 $n = [Windows.UI.Notifications.ToastNotification]::new($x)
 [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}\WindowsPowerShell\v1.0\powershell.exe').Show($n)
 `
@@ -32,7 +33,7 @@ func notify(title, body string) {
 	}
 	cmd := hidden(exec.Command("powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
 		"-EncodedCommand", base64.StdEncoding.EncodeToString(buf)))
-	cmd.Env = append(os.Environ(), "CAS_TOAST_TITLE="+title, "CAS_TOAST_BODY="+body)
+	cmd.Env = append(os.Environ(), "CAS_TOAST_TITLE="+title, "CAS_TOAST_BODY="+body, "CAS_TOAST_OK="+tr("Got it"))
 	if out, err := cmd.CombinedOutput(); err != nil {
 		log.Printf("notify: %v %s", err, out)
 	}

@@ -135,7 +135,7 @@
       </svg>
     </div>
     <div>
-      <h1>Continue your chats?</h1>
+      <h1 id="h1">Continue your chats?</h1>
       <p id="lead"></p>
     </div>
   </header>
@@ -172,16 +172,25 @@
 <script>
 const data = /*DATA*/{"account":"Senior Claus (Pro)","wait":30,"chats":[{"title":"Stripe-Zahlung und Validierung","folder":"Trilluminati"},{"title":"Fix the login bug & add tests","folder":"ClaudeAccountSwitcher"}]};
 const $ = id => document.getElementById(id);
+// 界面语言由 switcher 传入（data.lang）；L(English, 中文) 按语言取文案。
+const ZH = data.lang === "zh";
+const L = (en, zh) => ZH ? zh : en;
+if (ZH) {
+  document.documentElement.lang = "zh-CN";
+  document.title = "继续这些对话？";
+  $("h1").textContent = "继续这些对话？";
+  $("skip").textContent = "不继续";
+}
 const send = (name, arg) => (typeof window[name] === "function" ? window[name](arg) : console.log(name, arg));
 
 const lead = $("lead");
-lead.append(data.account ? "These chats were working when Claude closed to switch to " : "These chats were working when Claude closed. ");
+lead.append(data.account ? L("These chats were working when Claude closed to switch to ", "切换时 Claude 关闭，这些对话正在进行。切换到 ") : L("These chats were working when Claude closed. ", "Claude 关闭时这些对话正在进行。"));
 if (data.account) {
   const b = document.createElement("b");
   b.textContent = data.account;
-  lead.append(b, ". ");
+  lead.append(b, L(". ", " 后，"));
 }
-lead.append("Checked chats pick up where they left off.");
+lead.append(L("Checked chats pick up where they left off.", "勾选的对话会从中断处继续。"));
 
 const boxes = data.chats.map((chat, i) => {
   const row = $("row").content.firstElementChild.cloneNode(true);
@@ -199,9 +208,9 @@ const boxes = data.chats.map((chat, i) => {
 
 function update() {
   const n = boxes.filter(b => b.checked).length;
-  $("count").textContent = `${n} of ${boxes.length} selected`;
-  $("toggle").textContent = n === boxes.length ? "Select none" : "Select all";
-  $("go").textContent = n === 0 ? "Continue" : n === 1 ? "Continue 1 chat" : `Continue ${n} chats`;
+  $("count").textContent = L(`${n} of ${boxes.length} selected`, `已选 ${n} / ${boxes.length}`);
+  $("toggle").textContent = n === boxes.length ? L("Select none", "全不选") : L("Select all", "全选");
+  $("go").textContent = n === 0 ? L("Continue", "继续") : n === 1 ? L("Continue 1 chat", "继续 1 个对话") : L(`Continue ${n} chats`, `继续 ${n} 个对话`);
   $("go").disabled = n === 0;
 }
 
@@ -230,17 +239,17 @@ const ends = Date.now() + data.wait * 1000;
 const tick = setInterval(() => {
   const ms = Math.max(0, ends - Date.now());
   $("fill").style.width = (ms / (data.wait * 1000)) * 100 + "%";
-  $("left").textContent = `Continuing in ${Math.ceil(ms / 1000)} s`;
+  $("left").textContent = L(`Continuing in ${Math.ceil(ms / 1000)} s`, `${Math.ceil(ms / 1000)} 秒后继续`);
   if (ms === 0) finish(boxes.map(b => b.checked));
 }, 100);
-$("left").textContent = `Continuing in ${data.wait} s`;
+$("left").textContent = L(`Continuing in ${data.wait} s`, `${data.wait} 秒后继续`);
 
 // Someone choosing gets all the time they need.
 function pause() {
   if ($("timer").classList.contains("paused")) return;
   clearInterval(tick);
   $("timer").classList.add("paused");
-  $("left").textContent = "Waiting for you";
+  $("left").textContent = L("Waiting for you", "等你选择");
 }
 
 update();

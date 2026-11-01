@@ -65,6 +65,8 @@ type State struct {
 	// 5 小时窗口预热（默认关）和每个账户的预热记录，见 warmup.go。
 	Warmup bool                `json:"warmup,omitempty"`
 	Warm   map[string]*warmRec `json:"warm,omitempty"`
+	// Lang 是界面语言 zh / en；为空时按系统语言，见 i18n.go。
+	Lang string `json:"lang,omitempty"`
 
 	NoUpdateCheck bool      `json:"noUpdateCheck,omitempty"`
 	UpdateChecked time.Time `json:"updateChecked,omitempty"`
@@ -136,6 +138,11 @@ func newSwitcher(dir string) *switcher {
 	}
 	if s.st.Threshold <= 0 {
 		s.st.Threshold = defaultThreshold
+	}
+	if s.st.Lang != "" {
+		setLang(s.st.Lang)
+	} else {
+		setLang(systemLang())
 	}
 	return s
 }
@@ -359,9 +366,9 @@ func (s *switcher) check(ctx context.Context) (string, func() error) {
 	switch {
 	case added && adding:
 		// A fresh sign-in: restart once so the chats of the other accounts show up.
-		return "导入对话", s.importChats
+		return "Importing chats", s.importChats
 	case target != nil:
-		return "自动切换", func() error { return s.switchTo(target.UUID, cause) }
+		return "Auto switch", func() error { return s.switchTo(target.UUID, cause) }
 	}
 	return "", nil
 }
@@ -427,7 +434,7 @@ func (s *switcher) run(what string, f func() error) {
 	err := f()
 	s.busy.Store(false)
 	if err != nil {
-		s.setStatus(fmt.Sprintf("%s失败：%v", what, err))
+		s.setStatus(trf("%s failed: %v", tr(what), err))
 		return
 	}
 	s.mu.Lock()
@@ -452,7 +459,7 @@ func (s *switcher) restart(change func(active string) error) error {
 	s.mu.Unlock()
 	defer func() {
 		if err := startDesktop(exe); err != nil {
-			s.setStatus("无法启动 Claude：" + err.Error())
+			s.setStatus(tr("Could not start Claude: ") + err.Error())
 		}
 	}()
 	bk, err := backup(s.app(), s.backupsDir())
@@ -554,7 +561,7 @@ func (s *switcher) switchTo(uuid string, cause switchCause) error {
 	if _, err := os.Stat(filepath.Join(s.profileDir(uuid), "config.json")); err != nil && uuid != s.snapshot().Active {
 		return fmt.Errorf("no saved sign-in for %s, use Add account", target.label())
 	}
-	s.setStatus("正在切换到 " + target.label() + "…")
+	s.setStatus(trf("Switching to %s…", target.label()))
 	err := s.restart(func(active string) error {
 		if active == uuid {
 			return nil
@@ -598,7 +605,7 @@ func (s *switcher) switchTo(uuid string, cause switchCause) error {
 
 // addAccount keeps the current sign-in and opens the app on its login screen.
 func (s *switcher) addAccount() error {
-	s.setStatus("请在 Claude 中登录另一个账户")
+	s.setStatus(tr("Sign in with the other account in Claude"))
 	err := s.restart(func(active string) error {
 		if err := s.saveActive(active); err != nil {
 			return err
@@ -615,7 +622,7 @@ func (s *switcher) addAccount() error {
 
 // importChats makes the chats of all accounts visible in the signed-in one.
 func (s *switcher) importChats() error {
-	s.setStatus("正在导入对话…")
+	s.setStatus(tr("Importing chats…"))
 	return s.restart(func(active string) error {
 		s.mu.Lock()
 		a := s.account(active)
@@ -664,6 +671,16 @@ func (s *switcher) setSpendWeekly(on bool) {
 func (s *switcher) setCompactReminder(on bool) {
 	s.mu.Lock()
 	s.st.NoCompactReminder = !on
+	s.saveState()
+	s.mu.Unlock()
+	s.onChange()
+}
+
+// setLanguage 切换界面语言并保存，菜单和仪表盘随即刷新。
+func (s *switcher) setLanguage(l string) {
+	setLang(l)
+	s.mu.Lock()
+	s.st.Lang = lang()
 	s.saveState()
 	s.mu.Unlock()
 	s.onChange()
@@ -730,13 +747,13 @@ func (s *switcher) autoNote(now time.Time) string {
 	at := resetText(s.st.LastSwitch, now)
 	switch s.st.LastCause {
 	case nearlyFull:
-		from := "上一个账户"
+		from := tr("the last account")
 		if a := s.account(s.st.LastFrom); a != nil {
 			from = a.label()
 		}
-		return fmt.Sprintf("%s 自动切换：%s 快用满了", at, from)
+		return trf("Auto-switched at %s, %s was nearly full", at, from)
 	case spendWeekly:
-		return fmt.Sprintf("%s 自动切换：在 %s 重置前用完这个账户的周额度", at, resetText(s.st.SpendUntil, now))
+		return trf("Auto-switched at %s to use up this account's week before it resets %s", at, resetText(s.st.SpendUntil, now))
 	}
 	return ""
 }
@@ -753,11 +770,11 @@ func usageErrText(err error, retryAt time.Time) string {
 	var nerr net.Error
 	switch {
 	case errors.As(err, &limited):
-		return "被限流，" + retryAt.Format("15:04") + " 后重试"
+		return trf("rate limited, retrying after %s", retryAt.Format("15:04"))
 	case errors.Is(err, errSignedOut):
-		return "登录已过期，需要重新添加"
+		return tr("sign-in expired, add it again")
 	case errors.Is(err, context.DeadlineExceeded), errors.As(err, &nerr) && nerr.Timeout():
-		return "连接超时（检查代理/网络）"
+		return tr("connection timed out (check proxy/network)")
 	}
 	msg := err.Error()
 	if len(msg) > 80 {

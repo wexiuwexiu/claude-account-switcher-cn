@@ -79,9 +79,9 @@ func showResumeDialog(titles []string, wait time.Duration) []bool {
 	buttonsY := boxesY + listed*boxHeight + 8
 	height := buttonsY + btnH + margin
 	t.header(wsPopup|wsCaption|wsSysMenu|dsSetFont|dsModalFrame|dsSetForeground|dsCenter, wsExTopmost,
-		2+listed+1, width, height, "Continue chats?", 9, "Segoe UI")
+		2+listed+1, width, height, tr("Continue chats?"), 9, "Segoe UI")
 	t.item(wsChild|wsVisible|ssNoPrefix, margin, margin, width-2*margin, textHeight, 0xFFFF, classStatic,
-		"These chats were working when Claude closed for the switch. Claude continues the checked ones when it starts again.")
+		tr("These chats were working when Claude closed for the switch. Claude continues the checked ones when it starts again."))
 	for i := range resumeShown {
 		t.item(wsChild|wsVisible|wsTabStop|bsAutoCheckBox, margin, boxesY+i*boxHeight, width-2*margin, boxHeight-2,
 			uint16(firstBox+i), classButton, menuText(titles[i]))
@@ -91,7 +91,7 @@ func showResumeDialog(titles []string, wait time.Duration) []bool {
 			fmt.Sprintf("and %d more, which continue too", len(titles)-maxBoxes))
 	}
 	t.item(wsChild|wsVisible|wsTabStop|bsDefPushButton, width-margin-2*btnW-4, buttonsY, btnW, btnH, idOK, classButton, continueLabel())
-	t.item(wsChild|wsVisible|wsTabStop, width-margin-btnW, buttonsY, btnW, btnH, idCancel, classButton, "Don't continue")
+	t.item(wsChild|wsVisible|wsTabStop, width-margin-btnW, buttonsY, btnW, btnH, idCancel, classButton, tr("Don't continue"))
 
 	var inst windows.Handle
 	_ = windows.GetModuleHandleEx(0, nil, &inst)
@@ -157,9 +157,9 @@ func endResumeDialog(hwnd, id uintptr) {
 
 func continueLabel() string {
 	if resumeLeft > 0 {
-		return fmt.Sprintf("Continue (%d)", resumeLeft)
+		return trf("Continue (%d)", resumeLeft)
 	}
-	return "Continue"
+	return tr("Continue")
 }
 
 func setDialogText(hwnd, id uintptr, s string) {

@@ -1,4 +1,4 @@
-"""README 截图：用假账户数据渲染 dashboard.html，生成浅色 / 深色两张 PNG。
+"""README 截图：用假账户数据渲染 dashboard.html，生成中文浅色 / 深色 / 切换确认和英文浅色 / 切换确认 PNG。
 
 做什么：用 Playwright 打开 dashboard.html，拦截 api/state 返回虚构数据（不读本机任何账户），
        注入原生窗口的三个函数让页面按原生浮窗样式渲染，按页面上报的高度截图。
@@ -22,11 +22,11 @@ def iso(dt):
     return dt.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
-def fake_state(now):
+def fake_state(now, lang="zh"):
     """虚构 4 个账户：当前号用得快、一个周额度快到期（会被推荐）、一个 5 小时用满、一个仅网页登录。"""
     h = lambda x: now + timedelta(hours=x)
     return {
-        "now": iso(now), "threshold": 96, "warnAt": 85, "autoSwitch": False, "busy": False,
+        "now": iso(now), "lang": lang, "threshold": 96, "warnAt": 85, "autoSwitch": False, "busy": False,
         "accounts": [
             {"uuid": "a", "label": "Work (Pro)", "email": "work@example.com", "active": True,
              "session": {"pct": 62, "reset": iso(h(2.2))}, "weekly": {"pct": 41, "reset": iso(h(75))},
@@ -40,7 +40,8 @@ def fake_state(now):
             {"uuid": "d", "label": "Trial", "email": "trial@example.com", "active": False, "pending": True,
              "problem": "web sign-in only; usage shows after Pro + one use of the Code tab", "staleAfter": 900},
         ],
-        "bigChats": [{"title": "重构数据管道", "context": 412000}, {"title": "回测框架", "context": 186000}],
+        "bigChats": [{"title": "重构数据管道", "context": 412000}, {"title": "回测框架", "context": 186000}] if lang == "zh"
+        else [{"title": "Refactor data pipeline", "context": 412000}, {"title": "Backtest framework", "context": 186000}],
     }
 
 
@@ -48,10 +49,10 @@ def fake_state(now):
 STUBS = "window.hideDashboard=()=>{};window.pinDashboard=()=>{};window.fitDashboard=h=>{window.__h=h};"
 
 
-def shoot(browser, scheme, out, confirm=None):
+def shoot(browser, scheme, out, confirm=None, lang="zh"):
     page = browser.new_page(viewport={"width": WIDTH, "height": 900}, device_scale_factor=2, color_scheme=scheme)
     page.add_init_script(STUBS)
-    state = json.dumps(fake_state(datetime.now(timezone.utc)))
+    state = json.dumps(fake_state(datetime.now(timezone.utc), lang))
 
     def handle(route):
         url = route.request.url
@@ -80,4 +81,6 @@ with sync_playwright() as p:
     shoot(b, "light", ROOT / "assets" / "dashboard-light.png")
     shoot(b, "dark", ROOT / "assets" / "dashboard-dark.png")
     shoot(b, "light", ROOT / "assets" / "dashboard-confirm.png", confirm="b")
+    shoot(b, "light", ROOT / "assets" / "dashboard-light-en.png", lang="en")
+    shoot(b, "light", ROOT / "assets" / "dashboard-confirm-en.png", confirm="b", lang="en")
     b.close()
