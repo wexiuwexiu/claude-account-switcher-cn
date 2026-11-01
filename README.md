@@ -1,6 +1,6 @@
 > [!NOTE]
-> **这是 wexiu 的修改版**（分支 `wexiu`，版本 `0.3.5-wexiu.1`），基于 [SnlperStripes/claude-account-switcher](https://github.com/SnlperStripes/claude-account-switcher) v0.3.5。
-> 下文的原版说明、下载按钮和徽章都指向原项目；修改版目前需要自己编译，见下方「编译」。
+> **Claude 多账户切换器 · 中文增强版**（版本 `0.3.5-wexiu.1`），基于 [SnlperStripes/claude-account-switcher](https://github.com/SnlperStripes/claude-account-switcher) v0.3.5 修改，遵循 Apache 2.0，原作者信息见 [`NOTICE`](NOTICE)。
+> 下文「修改版改了什么」之后是原项目的英文说明，其中的下载按钮、徽章和 winget 都指向原版；修改版目前需要自己编译，见下方「编译」。
 
 <p align="center">
   <img src="assets/dashboard-light.png" width="300" alt="仪表盘（浅色）">
