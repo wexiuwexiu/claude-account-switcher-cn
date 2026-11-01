@@ -1,6 +1,13 @@
 > [!NOTE]
 > **Claude 多账户切换器 · 中文增强版**（版本 `0.3.5-wexiu.1`），基于 [SnlperStripes/claude-account-switcher](https://github.com/SnlperStripes/claude-account-switcher) v0.3.5 修改，遵循 Apache 2.0，原作者信息见 [`NOTICE`](NOTICE)。
-> 下文「修改版改了什么」之后是原项目的英文说明，其中的下载按钮、徽章和 winget 都指向原版；修改版目前需要自己编译，见下方「编译」。
+> 下文「修改版改了什么」之后是原项目的英文说明，其中的下载按钮、徽章和 winget 都指向原版。
+
+<p align="center">
+  <a href="https://github.com/wexiuwexiu/claude-account-switcher-cn/releases/latest/download/claude-account-switcher-windows-amd64.exe"><img src="https://img.shields.io/badge/下载_Windows_版-.exe-2ea44f?style=for-the-badge" alt="下载 Windows 版"></a>
+  <a href="https://github.com/wexiuwexiu/claude-account-switcher-cn/releases/latest"><img src="https://img.shields.io/github/v/release/wexiuwexiu/claude-account-switcher-cn?label=版本" alt="最新版本"></a>
+</p>
+
+下载后直接运行，无需安装。exe 没有代码签名，首次运行 SmartScreen 会提示"已保护你的电脑"，点 **更多信息 → 仍要运行**。每个 exe 旁有 `.sha256` 文件，可核对是 GitHub Actions 编译的原文件。
 
 <p align="center">
   <img src="assets/dashboard-light.png" width="300" alt="仪表盘（浅色）">
