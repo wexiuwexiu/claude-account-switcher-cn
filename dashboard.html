@@ -312,13 +312,13 @@ function hoverText(a, plan) {
   return [a.email, plan && '套餐 ' + plan, t && `登录 token 至 ${t.date}`, '数据 ' + freshDot(a).text, warmText(a)].filter(Boolean).join('\n');
 }
 
-// 预热状态（悬停显示）：没 token 时提示怎么设置
+// 预热状态（悬停显示）
 function warmText(a) {
   const w = a.warm;
-  if (!w || !w.token) return state.warmup ? '预热：未设置 token' : '';
+  if (!w) return '';
   if (w.err) return '预热：已停用';
   const last = w.last ? new Date(w.last) : null;
-  return '预热：已设置 token' + (last ? ` · 上次 ${pad(last.getHours())}:${pad(last.getMinutes())}` : '') +
+  return '预热' + (last ? `：上次 ${pad(last.getHours())}:${pad(last.getMinutes())}` : '') +
     (w.today ? ` · 今天 ${w.today} 次` : '') + (w.tokens ? ` · 每次约 ${w.tokens} token` : '');
 }
 
@@ -329,7 +329,7 @@ function alertsFor(a, name) {
   else if (f.stale && a.checkedAt && !a.problem) out.push(['stale', name, `用量数据 ${f.text}，可能已过期`]);
   if (t && t.left <= 0) out.push(['err', name, `登录 token 已于 ${t.date} 到期，尽快切过去让 Claude 续期`]);
   else if (t && t.days < 7) out.push(['stale', name, `登录 token ${t.days} 天后到期，近期切过去用一下即可续期`]);
-  if (a.warm && a.warm.err) out.push(['err', name, `${a.warm.err}。重新运行 claude setup-token 后在托盘菜单设置`]);
+  if (a.warm && a.warm.err) out.push(['err', name, `预热已停用：${a.warm.err}。切到这个账户用一下 Claude、登录续期后自动恢复`]);
   return out;
 }
 

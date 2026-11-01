@@ -108,13 +108,12 @@ type dashAccount struct {
 	// LoginExpires 是保存的登录 token 过期时间，用于提醒长期不用的账户。
 	LoginExpires *time.Time `json:"loginExpires,omitempty"`
 	StaleAfter   int        `json:"staleAfter"`
-	// Warm 是预热情况：只在开启预热或已保存 token 时给出。
+	// Warm 是预热情况：只在预热过的账户上给出。
 	Warm *dashWarm `json:"warm,omitempty"`
 }
 
 // dashWarm 是一个账户的预热状态，见 warmup.go。
 type dashWarm struct {
-	Token  bool       `json:"token"`
 	Last   *time.Time `json:"last,omitempty"`
 	Today  int        `json:"today"`
 	Tokens int        `json:"tokens,omitempty"`
@@ -174,8 +173,11 @@ func buildDashState(snap snapshot, now time.Time) dashState {
 			exp := a.LoginExpires
 			da.LoginExpires = &exp
 		}
-		if r, ok := snap.Warm[a.UUID]; snap.WarmToken[a.UUID] || ok {
-			w := &dashWarm{Token: snap.WarmToken[a.UUID], Today: r.countOn(now.Local().Format("2006-01-02")), Tokens: r.Tokens, Err: r.Err}
+		if r, ok := snap.Warm[a.UUID]; ok {
+			w := &dashWarm{Today: r.countOn(now.Local().Format("2006-01-02")), Tokens: r.Tokens}
+			if r.stopped(a) {
+				w.Err = r.Err
+			}
 			if !r.Last.IsZero() {
 				last := r.Last
 				w.Last = &last

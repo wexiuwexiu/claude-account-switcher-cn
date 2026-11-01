@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"log"
 	"os"
 	"os/exec"
@@ -18,12 +17,14 @@ import (
 // （一个窗口结束就发一次极小的请求续上），这样不管几点开工，这些账户最多 5 小时、平均 2.5 小时
 // 就会重置，少切号。默认关闭。
 //
-// 请求方式：官方 claude CLI 的无头模式 + 用户为该账户生成的 setup-token（CLAUDE_CODE_OAUTH_TOKEN），
-// Haiku、无工具、一句话系统提示，实测约 600 token。不碰桌面端的登录，也不冒充客户端调 API。
+// 请求方式：官方 claude CLI 的无头模式，token 用 switcher 已保存的该账户桌面端登录
+// （和查用量是同一个，经 CLAUDE_CODE_OAUTH_TOKEN 传入，CLI 不会刷新或改写它）。
+// Haiku、无工具、一句话系统提示，实测约 600 token。不冒充客户端直接调 API。
+// 保存的 token 约 3～4 周到期，切到该账户用一下 Claude 就会续期；到期的账户跳过。
 //
 // 限制（减少请求量，见 warmPick）：
 //   - 最近 warmActiveFor 内有对话活动才预热；睡觉、几天不用时不发；
-//   - 只预热按周额度紧迫度排前 warmTargets 名、且已配置 token 的账户；
+//   - 只预热按周额度紧迫度排前 warmTargets 名、且保存的 token 未到期的账户；
 //   - 任意两次预热至少间隔 warmGap（顺带把两个账户的窗口错开）；
 //   - 每个账户每天最多 warmPerAccount 次，全部每天最多 warmPerDay 次；
 //   - 预热后若用量里没出现 5 小时重置时间，记一次失败；连续 warmMaxFails 次就停用该账户并提示。
@@ -47,9 +48,21 @@ type warmRec struct {
 	Count  int       `json:"count,omitempty"`
 	Verify time.Time `json:"verify,omitempty"` // 等待确认的那次预热时间；确认后清零
 	Fails  int       `json:"fails,omitempty"`
-	// Err 不为空时该账户停止预热，直到重新设置 token。
-	Err    string `json:"err,omitempty"`
-	Tokens int    `json:"tokens,omitempty"` // 最近一次预热消耗的 token 总数
+	// Err 不为空时该账户停止预热；ErrLogin 是出错时保存的登录到期时间，
+	// 切到该账户后登录续期（到期时间变了）就自动恢复。
+	Err      string    `json:"err,omitempty"`
+	ErrLogin time.Time `json:"errLogin,omitempty"`
+	Tokens   int       `json:"tokens,omitempty"` // 最近一次预热消耗的 token 总数
+}
+
+// stopped 表示该账户因出错停止预热，且登录还没续期过。
+func (r *warmRec) stopped(a Account) bool {
+	return r != nil && r.Err != "" && r.ErrLogin.Equal(a.LoginExpires)
+}
+
+// loginValid 表示保存的登录 token 还没到期（不知道到期时间时也尝试）。
+func loginValid(a Account, now time.Time) bool {
+	return a.LoginExpires.IsZero() || a.LoginExpires.After(now)
 }
 
 func (r *warmRec) countOn(day string) int {
@@ -78,8 +91,8 @@ func urgency(a Account, threshold float64, now time.Time) float64 {
 }
 
 // warmPick 选出现在该预热的账户，没有则返回空。纯函数，便于测试。
-// hasToken 判断账户是否已配置预热 token；lastChat 是最近一次对话活动时间。
-func warmPick(accts []Account, recs map[string]*warmRec, hasToken func(string) bool, threshold float64, lastChat, now time.Time) string {
+// lastChat 是最近一次对话活动时间。
+func warmPick(accts []Account, recs map[string]*warmRec, threshold float64, lastChat, now time.Time) string {
 	if lastChat.IsZero() || now.Sub(lastChat) > warmActiveFor {
 		return ""
 	}
@@ -94,10 +107,10 @@ func warmPick(accts []Account, recs map[string]*warmRec, hasToken func(string) b
 	if total >= warmPerDay {
 		return ""
 	}
-	// 只在已配置 token、未停用的账户里按紧迫度取前 warmTargets 名
+	// 只在登录未到期、未停用的账户里按紧迫度取前 warmTargets 名
 	var cands []Account
 	for _, a := range accts {
-		if r := recs[a.UUID]; hasToken(a.UUID) && (r == nil || r.Err == "") && urgency(a, threshold, now) > 0 {
+		if loginValid(a, now) && !recs[a.UUID].stopped(a) && urgency(a, threshold, now) > 0 {
 			cands = append(cands, a)
 		}
 	}
@@ -130,59 +143,10 @@ func warmVerdict(r *warmRec, u *Usage, now time.Time) (done, ok bool) {
 	return now.Sub(r.Verify) > warmVerifyBy, false
 }
 
-// ---- token 存取（加密由平台文件实现：Windows 用 DPAPI） ----
-
-func (s *switcher) warmTokenPath(uuid string) string {
-	return filepath.Join(s.profileDir(uuid), "warmup-token.bin")
-}
-
-func (s *switcher) hasWarmToken(uuid string) bool {
-	_, err := os.Stat(s.warmTokenPath(uuid))
-	return err == nil
-}
-
-// setWarmTokenFromClipboard 把剪贴板里的 setup-token 加密保存为 uuid 账户的预热 token，
-// 成功后清空剪贴板。token 属于哪个账户无法离线核对，第一次预热后的确认会发现填错。
-func (s *switcher) setWarmTokenFromClipboard(uuid string) error {
-	tok, err := readClipboard()
-	if err != nil {
-		return fmt.Errorf("read clipboard: %w", err)
-	}
-	tok = strings.TrimSpace(tok)
-	if !strings.HasPrefix(tok, "sk-ant-oat") || strings.ContainsAny(tok, " \r\n\t") {
-		return errors.New("clipboard has no setup-token; run `claude setup-token` and copy the token it prints")
-	}
-	enc, err := protect([]byte(tok))
-	if err != nil {
-		return err
-	}
-	if err := os.MkdirAll(s.profileDir(uuid), 0o700); err != nil {
-		return err
-	}
-	if err := writeFileAtomic(s.warmTokenPath(uuid), enc); err != nil {
-		return err
-	}
-	clearClipboard()
-	s.mu.Lock()
-	delete(s.st.Warm, uuid) // 新 token：清掉旧的失败和停用
-	s.saveState()
-	label := uuid[:8]
-	if a := s.account(uuid); a != nil {
-		label = a.label()
-	}
-	s.mu.Unlock()
-	log.Printf("warmup token saved for %s", label)
-	s.onChange()
-	return nil
-}
-
+// warmToken 取该账户已保存的桌面端登录 token（当前账户取 Claude 里正在用的），与查用量相同。
 func (s *switcher) warmToken(uuid string) (string, error) {
-	data, err := os.ReadFile(s.warmTokenPath(uuid))
-	if err != nil {
-		return "", err
-	}
-	tok, err := unprotect(data)
-	return string(tok), err
+	active, _ := s.app().activeAccount()
+	return s.tokenFor(uuid, active)
 }
 
 // ---- 发送预热 ----
@@ -289,14 +253,14 @@ func (s *switcher) warmStep(ctx context.Context, now time.Time) {
 		}
 		r.Verify, changed = time.Time{}, true
 		if ok {
-			r.Fails = 0
+			r.Fails, r.Err = 0, ""
 			log.Printf("warmup %s: 5-hour window started", a.label())
 			continue
 		}
 		r.Fails++
 		log.Printf("warmup %s: no 5-hour window after the request (%d/%d)", a.label(), r.Fails, warmMaxFails)
 		if r.Fails >= warmMaxFails {
-			r.Err = "预热后窗口没有开始计时，token 可能不属于这个账户"
+			r.Err, r.ErrLogin = "预热后 5 小时窗口没有开始计时", a.LoginExpires
 		}
 	}
 	accts := make([]Account, 0, len(s.st.Accounts))
@@ -318,7 +282,7 @@ func (s *switcher) warmStep(ctx context.Context, now time.Time) {
 	}
 
 	// 2. 选账户并发送
-	uuid := warmPick(accts, recs, s.hasWarmToken, threshold, lastChatWrite(s.app().sessionsDir()), now)
+	uuid := warmPick(accts, recs, threshold, lastChatWrite(s.app().sessionsDir()), now)
 	if uuid == "" {
 		return
 	}
@@ -348,6 +312,9 @@ func (s *switcher) warmStep(ctx context.Context, now time.Time) {
 		r.Fails++
 		if r.Fails >= warmMaxFails || strings.Contains(msg, "401") || strings.Contains(strings.ToLower(msg), "auth") {
 			r.Err = "预热失败：" + msg
+			if a != nil {
+				r.ErrLogin = a.LoginExpires
+			}
 		}
 		log.Printf("warmup %s failed: %v", uuid[:8], err)
 	} else {

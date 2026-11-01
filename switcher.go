@@ -662,8 +662,6 @@ type snapshot struct {
 	// Warmup 是否开启预热；Warm 是各账户预热记录的副本（键为 UUID）。
 	Warmup bool
 	Warm   map[string]warmRec
-	// WarmToken 表示该账户已保存预热 token（键为 UUID）。
-	WarmToken map[string]bool
 }
 
 func (s *switcher) snapshot() snapshot {
@@ -674,7 +672,7 @@ func (s *switcher) snapshot() snapshot {
 	for k, v := range s.errs {
 		snap.Errs[k] = v
 	}
-	snap.Warmup, snap.Warm, snap.WarmToken = s.st.Warmup, map[string]warmRec{}, map[string]bool{}
+	snap.Warmup, snap.Warm = s.st.Warmup, map[string]warmRec{}
 	for k, v := range s.st.Warm {
 		if v != nil {
 			snap.Warm[k] = *v
@@ -685,7 +683,6 @@ func (s *switcher) snapshot() snapshot {
 	}
 	for _, a := range s.st.Accounts {
 		snap.Accounts = append(snap.Accounts, *a)
-		snap.WarmToken[a.UUID] = s.hasWarmToken(a.UUID)
 	}
 	return snap
 }

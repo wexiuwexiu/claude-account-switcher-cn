@@ -24,7 +24,6 @@ type tray struct {
 	spend      *systray.MenuItem
 	compact    *systray.MenuItem
 	warm       *systray.MenuItem
-	warmTokens [maxAccounts]*systray.MenuItem
 	thresholds []*systray.MenuItem
 	add        *systray.MenuItem
 	importNow  *systray.MenuItem
@@ -57,13 +56,8 @@ func (t *tray) onReady() {
 	}
 	t.spend = systray.AddMenuItemCheckbox("Auto-switch to use up expiring weekly", "Switch to an account whose weekly limit resets within a day with half or more of it unused", false)
 	t.compact = systray.AddMenuItemCheckbox("Remind to /compact before switching", "When the 5-hour limit will run out soon, remind to compact large chats before switching accounts", false)
-	// 5 小时窗口预热，见 warmup.go；token 子菜单从剪贴板读取 `claude setup-token` 的输出
+	// 5 小时窗口预热，见 warmup.go；用各账户已保存的登录，不需要额外设置
 	t.warm = systray.AddMenuItemCheckbox("Warm up 5-hour windows", "While you use Claude, keep the 5-hour window of the 2 most urgent accounts running with a tiny Haiku request (about 600 tokens)", false)
-	warmTok := systray.AddMenuItem("Warmup token from clipboard", "Run `claude setup-token` signed in as the account, copy the token, then pick the account here")
-	for i := range t.warmTokens {
-		t.warmTokens[i] = warmTok.AddSubMenuItemCheckbox("", "Save the copied setup-token for this account (encrypted with DPAPI) and clear the clipboard", false)
-		t.warmTokens[i].Hide()
-	}
 	t.add = systray.AddMenuItem("Add account…", "Restart Claude on its sign-in screen, your current account is kept")
 	t.importNow = systray.AddMenuItem("Import chats from all accounts", "Restart Claude so every chat shows up in this account")
 	systray.AddSeparator()
@@ -86,21 +80,6 @@ func (t *tray) onReady() {
 					go t.s.run("Switch", func() error { return t.s.switchTo(snap.Accounts[i].UUID, byHand) })
 				}
 				t.s.onChange()
-			}
-		}()
-	}
-	for i, item := range t.warmTokens {
-		go func() {
-			for range item.ClickedCh {
-				snap := t.s.snapshot()
-				if i >= len(snap.Accounts) {
-					continue
-				}
-				if err := t.s.setWarmTokenFromClipboard(snap.Accounts[i].UUID); err != nil {
-					t.s.setStatus("Warmup token: " + err.Error())
-				} else {
-					t.s.setStatus("")
-				}
 			}
 		}()
 	}
@@ -248,20 +227,6 @@ func (t *tray) render() {
 	setChecked(t.spend, snap.SpendWeekly)
 	setChecked(t.compact, snap.CompactReminder)
 	setChecked(t.warm, snap.Warmup)
-	for i, item := range t.warmTokens {
-		if i >= len(snap.Accounts) {
-			item.Hide()
-			continue
-		}
-		a := snap.Accounts[i]
-		title := a.label()
-		if r, ok := snap.Warm[a.UUID]; ok && r.Err != "" {
-			title += menuTab + "stopped, set the token again"
-		}
-		item.SetTitle(title)
-		setChecked(item, snap.WarmToken[a.UUID])
-		item.Show()
-	}
 	for i, item := range t.thresholds {
 		setChecked(item, thresholds[i] == snap.Threshold)
 	}

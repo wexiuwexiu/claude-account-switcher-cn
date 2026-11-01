@@ -1,7 +1,6 @@
 package main
 
 import (
-	"runtime"
 	"testing"
 	"time"
 )
@@ -13,7 +12,6 @@ func TestWarmPick(t *testing.T) {
 	acct := func(id string, weekly float64, weekLeft time.Duration, sessionReset time.Time) Account {
 		return Account{UUID: id, Usage: &Usage{Weekly: weekly, WeeklyReset: now.Add(weekLeft), SessionReset: sessionReset, CheckedAt: fresh}}
 	}
-	all := func(string) bool { return true }
 	// a 最紧迫（剩 80%、1 天后重置），b 次之，c 最不紧迫
 	accts := []Account{
 		acct("c", 10, 6*24*time.Hour, time.Time{}),
@@ -22,49 +20,56 @@ func TestWarmPick(t *testing.T) {
 	}
 	active := now.Add(-time.Hour)
 
-	if got := warmPick(accts, nil, all, 96, active, now); got != "a" {
+	if got := warmPick(accts, nil, 96, active, now); got != "a" {
 		t.Fatalf("most urgent first: got %q", got)
 	}
-	if got := warmPick(accts, nil, all, 96, now.Add(-7*time.Hour), now); got != "" {
+	if got := warmPick(accts, nil, 96, now.Add(-7*time.Hour), now); got != "" {
 		t.Fatalf("idle user: got %q", got)
 	}
 	// a 的窗口在计时 -> 选 b；c 不在前 2 名，永远不选
 	running := append([]Account(nil), accts...)
 	running[1] = acct("a", 20, 24*time.Hour, now.Add(2*time.Hour))
-	if got := warmPick(running, nil, all, 96, active, now); got != "b" {
+	if got := warmPick(running, nil, 96, active, now); got != "b" {
 		t.Fatalf("a running: got %q", got)
 	}
 	running[2] = acct("b", 30, 2*24*time.Hour, now.Add(3*time.Hour))
-	if got := warmPick(running, nil, all, 96, active, now); got != "" {
+	if got := warmPick(running, nil, 96, active, now); got != "" {
 		t.Fatalf("top 2 running, c must not be picked: got %q", got)
 	}
-	// 没 token 的账户不算进前 2 名
-	if got := warmPick(accts, nil, func(id string) bool { return id != "a" }, 96, active, now); got != "b" {
-		t.Fatalf("a has no token: got %q", got)
+	// 保存的登录已到期的账户不算进前 2 名
+	expired := append([]Account(nil), accts...)
+	expired[1].LoginExpires = now.Add(-time.Hour)
+	if got := warmPick(expired, nil, 96, active, now); got != "b" {
+		t.Fatalf("a login expired: got %q", got)
 	}
 	// 间隔：任何账户 150 分钟内预热过就不发
 	recent := map[string]*warmRec{"b": {Last: now.Add(-time.Hour)}}
-	if got := warmPick(accts, recent, all, 96, active, now); got != "" {
+	if got := warmPick(accts, recent, 96, active, now); got != "" {
 		t.Fatalf("gap: got %q", got)
 	}
 	// 当天次数上限
 	day := now.Format("2006-01-02")
 	capped := map[string]*warmRec{"a": {Last: now.Add(-3 * time.Hour), Day: day, Count: warmPerAccount}}
-	if got := warmPick(accts, capped, all, 96, active, now); got != "b" {
+	if got := warmPick(accts, capped, 96, active, now); got != "b" {
 		t.Fatalf("a capped: got %q", got)
 	}
-	// 停用的账户跳过；待确认的账户不重复发
-	if got := warmPick(accts, map[string]*warmRec{"a": {Err: "x"}}, all, 96, active, now); got != "b" {
+	// 停用的账户跳过，登录续期（到期时间变了）后恢复；待确认的账户不重复发
+	if got := warmPick(accts, map[string]*warmRec{"a": {Err: "x"}}, 96, active, now); got != "b" {
 		t.Fatalf("a stopped: got %q", got)
 	}
-	if got := warmPick(accts, map[string]*warmRec{"a": {Last: now.Add(-3 * time.Hour), Verify: now.Add(-3 * time.Hour)}}, all, 96, active, now); got != "b" {
+	renewed := append([]Account(nil), accts...)
+	renewed[1].LoginExpires = now.Add(20 * 24 * time.Hour)
+	if got := warmPick(renewed, map[string]*warmRec{"a": {Err: "x"}}, 96, active, now); got != "a" {
+		t.Fatalf("a renewed: got %q", got)
+	}
+	if got := warmPick(accts, map[string]*warmRec{"a": {Last: now.Add(-3 * time.Hour), Verify: now.Add(-3 * time.Hour)}}, 96, active, now); got != "b" {
 		t.Fatalf("a verifying: got %q", got)
 	}
 	// 用量数据比上次预热旧：不发
 	stale := map[string]*warmRec{"a": {Last: now.Add(-3 * time.Hour)}}
 	old := append([]Account(nil), accts...)
 	old[1].Usage = &Usage{Weekly: 20, WeeklyReset: now.Add(24 * time.Hour), CheckedAt: now.Add(-4 * time.Hour)}
-	if got := warmPick(old, stale, all, 96, active, now); got != "b" {
+	if got := warmPick(old, stale, 96, active, now); got != "b" {
 		t.Fatalf("stale usage for a: got %q", got)
 	}
 }
@@ -103,23 +108,5 @@ func TestUrgency(t *testing.T) {
 	}
 	if urgency(Account{Problem: "x", Usage: &Usage{}}, 96, now) != 0 {
 		t.Fatal("problem should be 0")
-	}
-}
-
-// DPAPI 加密能还原，且密文不含明文。
-func TestProtectRoundTrip(t *testing.T) {
-	if runtime.GOOS != "windows" {
-		t.Skip("DPAPI is Windows only")
-	}
-	enc, err := protect([]byte("sk-ant-oat01-test"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if string(enc) == "sk-ant-oat01-test" {
-		t.Fatal("not encrypted")
-	}
-	dec, err := unprotect(enc)
-	if err != nil || string(dec) != "sk-ant-oat01-test" {
-		t.Fatalf("round trip: %q %v", dec, err)
 	}
 }
