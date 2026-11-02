@@ -346,3 +346,11 @@ func start(name string, args ...string) error {
 	go cmd.Wait()
 	return nil
 }
+
+// confirmBox 弹出"是/否"确认框，用户点"是"返回 true。会阻塞到用户回答，不要在菜单事件循环里直接调用。
+func confirmBox(title, text string) bool {
+	t, _ := windows.UTF16PtrFromString(title)
+	m, _ := windows.UTF16PtrFromString(text)
+	ret, _ := windows.MessageBox(0, m, t, windows.MB_YESNO|windows.MB_ICONWARNING|windows.MB_DEFBUTTON2|windows.MB_TOPMOST)
+	return ret == 6 // IDYES，x/sys 没有定义这个常量
+}

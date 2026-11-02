@@ -111,3 +111,9 @@ func setAutostart(on bool) error {
 }
 
 func relaunchOutsideDesktop(string) bool { return false }
+
+// confirmBox 用 osascript 弹出确认框，用户点"OK"返回 true（取消时 osascript 返回错误）。
+func confirmBox(title, text string) bool {
+	script := fmt.Sprintf(`display dialog %q with title %q buttons {"Cancel", "OK"} default button "Cancel" with icon caution`, text, title)
+	return exec.Command("osascript", "-e", script).Run() == nil
+}

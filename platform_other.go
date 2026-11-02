@@ -41,3 +41,6 @@ func nativeResume(titles []string, _ time.Duration) []bool {
 }
 
 func showWebDialog(string, int) ([]bool, error) { return nil, errUnsupported }
+
+// confirmBox：没有桌面端的平台无法确认，一律按"否"处理。
+func confirmBox(title, text string) bool { return false }

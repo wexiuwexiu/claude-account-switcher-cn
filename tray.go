@@ -27,6 +27,9 @@ type tray struct {
 	warm       *systray.MenuItem
 	thresholds []*systray.MenuItem
 	add        *systray.MenuItem
+	// remove 是"移除账户"子菜单，removes 是其中每个账户一项（账户行本身点击要切换，不能挂子菜单）。
+	remove     *systray.MenuItem
+	removes    [maxAccounts]*systray.MenuItem
 	importNow  *systray.MenuItem
 	autostart  *systray.MenuItem
 	langZH     *systray.MenuItem
@@ -99,6 +102,12 @@ func (t *tray) onReady() {
 	// 5 小时窗口预热，见 warmup.go；用各账户已保存的登录，不需要额外设置
 	t.warm = t.checkbox("Warm up 5-hour windows", "While you use Claude, keep the 5-hour window of the 2 most urgent accounts running with a tiny Haiku request (about 600 tokens)", false)
 	t.add = t.menu("Add account…", "Restart Claude on its sign-in screen, your current account is kept")
+	// 移除账户：确认后从列表去掉，登录文件移到 removed/<uuid>/ 保留，见 switcher.removeAccount
+	t.remove = t.menu("Remove account", "Take an account off the list; its saved sign-in is moved to the removed folder, not deleted")
+	for i := range t.removes {
+		t.removes[i] = t.remove.AddSubMenuItem("", "")
+		t.removes[i].Hide()
+	}
 	t.importNow = t.menu("Import chats from all accounts", "Restart Claude so every chat shows up in this account")
 	systray.AddSeparator()
 	// Rewriting an enabled entry keeps its path current and adds the Task
@@ -124,6 +133,23 @@ func (t *tray) onReady() {
 					go t.s.run("Switch", func() error { return t.s.switchTo(snap.Accounts[i].UUID, byHand) })
 				}
 				t.s.onChange()
+			}
+		}()
+	}
+	for i, item := range t.removes {
+		go func() {
+			for range item.ClickedCh {
+				snap := t.s.snapshot()
+				if i >= len(snap.Accounts) || snap.Accounts[i].UUID == snap.Active || snap.Busy {
+					continue
+				}
+				a := snap.Accounts[i]
+				// 确认框会阻塞，放到单独的 goroutine，菜单仍可响应
+				go func() {
+					if confirmBox(tr("Remove account"), trf("Remove %s from the switcher?\n\nIt is no longer switched to, warmed up or checked. Its saved sign-in is moved to %s and can be put back.", a.label(), t.s.removedDir(a.UUID))) {
+						t.s.run("Remove account", func() error { return t.s.removeAccount(a.UUID) })
+					}
+				}()
 			}
 		}()
 	}
@@ -274,6 +300,25 @@ func (t *tray) render() {
 		}
 	}
 	systray.SetTooltip(tip)
+	for i, item := range t.removes {
+		if i >= len(snap.Accounts) {
+			item.Hide()
+			continue
+		}
+		a := snap.Accounts[i]
+		if a.UUID == snap.Active {
+			item.SetTitle(a.label() + tr(" (in use)"))
+			item.Disable()
+		} else {
+			item.SetTitle(a.label() + "…")
+			if snap.Busy {
+				item.Disable()
+			} else {
+				item.Enable()
+			}
+		}
+		item.Show()
+	}
 	t.setIcon(activePct, snap.Threshold)
 
 	setChecked(t.auto, snap.AutoSwitch)
@@ -284,7 +329,7 @@ func (t *tray) render() {
 	for i, item := range t.thresholds {
 		setChecked(item, thresholds[i] == snap.Threshold)
 	}
-	for _, item := range []*systray.MenuItem{t.add, t.importNow} {
+	for _, item := range []*systray.MenuItem{t.add, t.importNow, t.remove} {
 		if snap.Busy {
 			item.Disable()
 		} else {

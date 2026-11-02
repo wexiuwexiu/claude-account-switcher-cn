@@ -695,6 +695,58 @@ func (s *switcher) setResumeChats(on bool) {
 	s.onChange()
 }
 
+// removedDir 是被移除账户的登录文件存放处：removed/<uuid>/，不删除，申诉成功等情况下可以恢复。
+func (s *switcher) removedDir(uuid string) string { return filepath.Join(s.dir, "removed", uuid) }
+
+// removeAccount 把账户从列表里去掉（例如被封禁的账户），不再切换、预热或查用量。
+// 数据来源：state.json 的 accounts 和 accounts/<uuid>/ 登录文件夹。
+// 注意：当前在用的账户不能移除（刷新时会被重新识别加回）；登录文件夹整体移到
+// removed/<uuid>/，同名已存在时加时间后缀，绝不删除，因为有些账户邮箱找不回来。
+// 恢复方法：把文件夹移回 accounts/，切到该账户或重新添加。
+func (s *switcher) removeAccount(uuid string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	a := s.account(uuid)
+	if a == nil {
+		return errors.New("unknown account")
+	}
+	if uuid == s.active {
+		return errors.New(tr("the account in use cannot be removed, switch to another one first"))
+	}
+	src := s.profileDir(uuid)
+	if _, err := os.Stat(src); err == nil {
+		dst := s.removedDir(uuid)
+		if _, err := os.Stat(dst); err == nil {
+			dst += "-" + time.Now().Format("20060102-150405")
+		}
+		if err := os.MkdirAll(filepath.Dir(dst), 0o700); err != nil {
+			return err
+		}
+		if err := os.Rename(src, dst); err != nil {
+			return fmt.Errorf("move sign-in: %w", err)
+		}
+		log.Printf("removed account %s, its sign-in is kept in %s", a.label(), dst)
+	} else {
+		log.Printf("removed account %s, it had no saved sign-in", a.label())
+	}
+	var kept []*Account
+	for _, x := range s.st.Accounts {
+		if x.UUID != uuid {
+			kept = append(kept, x)
+		}
+	}
+	s.st.Accounts = kept
+	delete(s.st.Warm, uuid)
+	delete(s.errs, uuid)
+	delete(s.backoff, uuid)
+	delete(s.strikes, uuid)
+	if s.st.Spending == uuid {
+		s.st.Spending, s.st.SpendUntil = "", time.Time{}
+	}
+	s.saveState()
+	return nil
+}
+
 // setLanguage 切换界面语言并保存，菜单和仪表盘随即刷新。
 func (s *switcher) setLanguage(l string) {
 	setLang(l)
