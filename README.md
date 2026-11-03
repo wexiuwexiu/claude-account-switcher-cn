@@ -1,5 +1,5 @@
 > [!NOTE]
-> **Claude 多账户切换器 · 中文增强版**（版本 `0.3.6-wexiu.1`），基于 [SnlperStripes/claude-account-switcher](https://github.com/SnlperStripes/claude-account-switcher) v0.3.6 修改，遵循 Apache 2.0，原作者信息见 [`NOTICE`](NOTICE)。
+> **Claude 多账户切换器 · 中文增强版**（版本 `0.3.6-wexiu.2`），基于 [SnlperStripes/claude-account-switcher](https://github.com/SnlperStripes/claude-account-switcher) v0.3.6 修改，遵循 Apache 2.0，原作者信息见 [`NOTICE`](NOTICE)。
 > 下文「修改版改了什么」之后是原项目的英文说明，其中的下载按钮、徽章和 winget 都指向原版。
 
 <p align="center">
@@ -23,6 +23,7 @@
 - 所有账户的 5 小时和周用量进度条、重置时间（带星期）、剩余时间、邮箱、套餐。
 - 按本窗口的使用速度预测 5 小时额度何时用完；按周额度剩余与重置时间推荐下一个该切的账户。
 - 显示每个账户数据的新鲜度和查询失败原因、保存的登录何时需要刷新。
+- 每个账户显示周限额还剩几天几小时重置，以及会员约何时到期（API 不给到期日，按订阅开通日逐月推算）。
 - 点账户切换前有确认面板，列出最近 1 小时内上下文 ≥ 15 万的对话（切号后续聊会在新账户里整段重写缓存）。
 - 可固定窗口（失焦不隐藏），高度随账户数自适应。WebView2 不可用时退回浏览器打开。
 
