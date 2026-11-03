@@ -76,3 +76,22 @@ func TestBigChats(t *testing.T) {
 		t.Fatalf("empty should be [], got %#v", got)
 	}
 }
+
+// nextRenewal 按月推算会员续费日，月底开通的落到目标月最后一天。
+func TestNextRenewal(t *testing.T) {
+	d := func(s string) time.Time { v, _ := time.Parse(time.RFC3339, s); return v }
+	cases := []struct{ since, now, want string }{
+		{"2026-10-23T16:11:34Z", "2026-11-04T00:00:00Z", "2026-11-23T16:11:34Z"},
+		{"2026-10-23T16:11:34Z", "2026-11-23T17:00:00Z", "2026-12-23T16:11:34Z"},
+		{"2026-01-31T08:00:00Z", "2026-02-10T00:00:00Z", "2026-02-28T08:00:00Z"},
+		{"2026-01-31T08:00:00Z", "2026-03-01T00:00:00Z", "2026-03-31T08:00:00Z"},
+	}
+	for _, c := range cases {
+		if got := nextRenewal(d(c.since), d(c.now)); !got.Equal(d(c.want)) {
+			t.Errorf("nextRenewal(%s, %s) = %s, want %s", c.since, c.now, got, c.want)
+		}
+	}
+	if !nextRenewal(time.Time{}, time.Now()).IsZero() {
+		t.Error("zero since should give zero")
+	}
+}

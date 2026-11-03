@@ -374,6 +374,18 @@ function whenText(w, withCountdown) {
   return withCountdown ? `${main} · ${L('还剩', 'in')} ${cd(w.reset)}` : main;
 }
 
+// 会员到期（下次续费）描述：开通日按月推算，所以写"约"；7 天内标橙
+const BILLING = {apple_subscription: ['App Store', 'App Store'], google_play_subscription: ['Google Play', 'Google Play'], stripe_subscription: ['网页', 'web']};
+function renewText(a) {
+  if (!a.renews) return '';
+  const at = new Date(a.renews), left = at - now();
+  const date = L(`${at.getMonth() + 1}月${at.getDate()}日`, `${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][at.getMonth()]} ${at.getDate()}`);
+  const days = Math.ceil(left / 864e5), b = BILLING[a.billing];
+  const main = L(`约 ${date} 到期`, `ends ~${date}`) + (b ? ` (${L(b[0], b[1])})` : '');
+  const txt = `${main} · ${L(`还剩 ${days} 天`, `${days}d left`)}`;
+  return days <= 7 ? `<b>${txt}</b>` : txt;
+}
+
 function heroCard(a, adv) {
   const [name, plan] = splitLabel(a.label), f = freshDot(a);
   const head = `<div class="who"><span class="name">${esc(name)}</span><span class="pill blue">${L('当前', 'current')}</span>
@@ -389,7 +401,8 @@ function heroCard(a, adv) {
   return `<div class="group" title="${esc(hoverText(a, plan))}"><div class="hero">
     <div class="rings"><svg viewBox="0 0 100 100">${ring(43, 11, s.pct, cs)}${ring(29.5, 11, w.pct, cw)}</svg>
       <div class="center"><b class="num">${Math.round(s.pct)}%</b><span>${L('5 小时', '5 hours')}</span></div></div>
-    <div>${head}${stat(L('5 小时', '5 hours'), cs, s, forecast(s))}${a.weekly ? stat(L('本周', 'Week'), cw, a.weekly, adv.stay ? `<div class="eta ok">${esc(adv.stay)}</div>` : '') : ''}</div></div></div>`;
+    <div>${head}${stat(L('5 小时', '5 hours'), cs, s, forecast(s))}${a.weekly ? stat(L('本周', 'Week'), cw, a.weekly, adv.stay ? `<div class="eta ok">${esc(adv.stay)}</div>` : '') : ''}
+      ${a.renews ? `<div class="stat"><div class="top"><span class="key"><i style="background:var(--purple, #8e5cf7)"></i>${L('会员', 'Plan')}</span></div><div class="when">${renewText(a)}</div></div>` : ''}</div></div></div>`;
 }
 
 function miniRing(label, w, base) {
@@ -407,7 +420,8 @@ function accRow(a, adv) {
   let l2;
   if (a.problem) l2 = esc(problemText(a.problem));
   else if (!a.session) l2 = L('用量未知', 'usage unknown');
-  else l2 = `<span class="k">${L('5 时', '5h')}</span>${whenText(a.session)}<br><span class="k">${L('本周', 'week')}</span>${whenText(a.weekly)}`;
+  else l2 = `<span class="k">${L('5 时', '5h')}</span>${whenText(a.session)}<br><span class="k">${L('本周', 'week')}</span>${whenText(a.weekly, !!(a.weekly && a.weekly.reset))}` +
+    (a.renews ? `<br><span class="k">${L('会员', 'plan')}</span>${renewText(a)}` : '');
   return `<div class="row${isRec ? ' rec' : ''}${can ? '' : ' disabled'}" data-uuid="${esc(a.uuid)}" title="${esc(hoverText(a, plan))}">
     ${avatar(a, name)}
     <div class="info"><div class="l1"><span class="nm">${esc(name)}</span>${pill}${mixedPlans() && plan ? `<span class="pill gray">${esc(plan)}</span>` : ''}<span class="mail">${esc(a.email || '')}</span></div>

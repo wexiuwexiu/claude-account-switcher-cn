@@ -49,7 +49,37 @@ type profile struct {
 	Organization struct {
 		UUID string `json:"uuid"`
 		Type string `json:"organization_type"`
+		// BillingType 如 apple_subscription / stripe_subscription；SubCreated 是本期订阅开通时间。
+		// API 不给到期日，下次续费日只能由开通时间按整月推算，见 nextRenewal。
+		BillingType string `json:"billing_type"`
+		SubCreated  string `json:"subscription_created_at"`
 	} `json:"organization"`
+}
+
+// subSince 解析订阅开通时间，没有或格式不对时为零值。
+func (p profile) subSince() time.Time {
+	t, _ := time.Parse(time.RFC3339Nano, p.Organization.SubCreated)
+	return t
+}
+
+// nextRenewal 按月付推算 since 之后、now 之后的第一个续费日（即本期会员到期日）。
+// 月底开通的按目标月最后一天算（1-31 开通 → 2 月底续费）。年付或已取消的订阅推算不准，
+// 页面上标"约"。
+func nextRenewal(since, now time.Time) time.Time {
+	if since.IsZero() {
+		return time.Time{}
+	}
+	y, m, d := since.Date()
+	h, mi, sec := since.Clock()
+	for k := 1; k < 1200; k++ {
+		first := time.Date(y, m+time.Month(k), 1, h, mi, sec, 0, since.Location())
+		last := first.AddDate(0, 1, -1).Day()
+		t := first.AddDate(0, 0, min(d, last)-1)
+		if t.After(now) {
+			return t
+		}
+	}
+	return time.Time{}
 }
 
 // plan names the subscription. The organization type is current; the

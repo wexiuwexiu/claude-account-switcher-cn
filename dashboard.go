@@ -108,6 +108,10 @@ type dashAccount struct {
 	// LoginExpires 是保存的登录 token 过期时间，用于提醒长期不用的账户。
 	LoginExpires *time.Time `json:"loginExpires,omitempty"`
 	StaleAfter   int        `json:"staleAfter"`
+	// Renews 是按会员开通日逐月推算的下次续费日（即本期会员到期日），Billing 是付费渠道；
+	// API 不直接给到期日，页面上标"约"。没查到开通时间时为空。
+	Renews  *time.Time `json:"renews,omitempty"`
+	Billing string     `json:"billing,omitempty"`
 	// Warm 是预热情况：只在预热过的账户上给出。
 	Warm *dashWarm `json:"warm,omitempty"`
 }
@@ -173,6 +177,9 @@ func buildDashState(snap snapshot, now time.Time) dashState {
 		if !a.LoginExpires.IsZero() {
 			exp := a.LoginExpires
 			da.LoginExpires = &exp
+		}
+		if r := nextRenewal(a.SubSince, now); !r.IsZero() {
+			da.Renews, da.Billing = &r, a.Billing
 		}
 		if r, ok := snap.Warm[a.UUID]; ok {
 			w := &dashWarm{Today: r.countOn(now.Local().Format("2006-01-02")), Tokens: r.Tokens}

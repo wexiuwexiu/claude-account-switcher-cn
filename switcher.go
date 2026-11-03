@@ -29,7 +29,15 @@ type Account struct {
 	// LoginExpires 是保存的登录里最早到期的 token 时间（到期后靠 refreshToken 续期，
 	// 所以是"建议在此之前用一次"的时间，不是登录失效时间）。读不到时保留上次的值。
 	LoginExpires time.Time `json:"loginExpires,omitempty"`
+	// SubSince 是本期会员订阅开通时间、Billing 是付费渠道，来自 /api/oauth/profile，
+	// 用来推算会员到期（续费）日；ProfileAt 是上次查资料的时间，每 profileEvery 重查一次。
+	SubSince  time.Time `json:"subSince,omitempty"`
+	Billing   string    `json:"billing,omitempty"`
+	ProfileAt time.Time `json:"profileAt,omitempty"`
 }
+
+// profileEvery 是已有账户重查资料（套餐、会员开通时间）的间隔：续费或换套餐后一天内跟上。
+const profileEvery = 24 * time.Hour
 
 func (a *Account) label() string {
 	name := a.Name
@@ -235,11 +243,12 @@ func (s *switcher) check(ctx context.Context) (string, func() error) {
 	type job struct {
 		uuid string
 		new  bool
+		prof bool // 顺便重查资料（套餐、会员开通时间）
 	}
 	now := time.Now()
 	var jobs []job
 	if active != "" && s.account(active) == nil && now.After(s.backoff[active]) {
-		jobs = append(jobs, job{active, true})
+		jobs = append(jobs, job{active, true, true})
 	}
 	for _, a := range s.st.Accounts {
 		every := idleEvery
@@ -252,7 +261,7 @@ func (s *switcher) check(ctx context.Context) (string, func() error) {
 		due := a.Usage == nil || now.Sub(a.Usage.CheckedAt) >= every-5*time.Second
 		if due && now.After(s.backoff[a.UUID]) {
 			// 仅网页登录的账户每次都按"新账户"查一遍：有 token 了就补全资料。
-			jobs = append(jobs, job{a.UUID, a.Pending})
+			jobs = append(jobs, job{a.UUID, a.Pending, a.Pending || now.Sub(a.ProfileAt) >= profileEvery})
 		}
 	}
 	s.mu.Unlock()
@@ -270,7 +279,7 @@ func (s *switcher) check(ctx context.Context) (string, func() error) {
 		}
 		var p profile
 		var u *Usage
-		if err == nil && j.new {
+		if err == nil && j.prof {
 			p, err = fetchProfile(ctx, token)
 		}
 		if err == nil {
@@ -310,6 +319,12 @@ func (s *switcher) check(ctx context.Context) (string, func() error) {
 			s.st.Accounts = append(s.st.Accounts, a)
 			added = true
 			log.Printf("added account %s", a.label())
+		}
+		if a != nil && err == nil && j.prof {
+			if pl := p.plan(); pl != "" {
+				a.Plan = pl
+			}
+			a.SubSince, a.Billing, a.ProfileAt = p.subSince(), p.Organization.BillingType, time.Now()
 		}
 		if a != nil {
 			switch {
